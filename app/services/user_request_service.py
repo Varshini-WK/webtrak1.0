@@ -27,6 +27,8 @@ from app.schemas.user_request import (
 )
 from app.services.comp_off_service import CompOffService
 from app.services.notification_service import NotificationService
+from app.services.email_service import EmailService
+from app.domain.email_templates import USER_REQUEST_STATUS_UPDATE, USER_REQUEST_SUBMIT
 
 
 def _normalize_roles(actor_roles: set[str]) -> set[str]:
@@ -51,6 +53,7 @@ class UserRequestService:
         self.leave_tx_repo = LeaveTransactionRepository(db)
         self.comp_off_service = CompOffService(db)
         self.notification_service = NotificationService(db)
+        self.email_service = EmailService()
 
     @staticmethod
     def _request_created_type(request_type: str) -> NotificationType:
@@ -413,7 +416,43 @@ class UserRequestService:
                 message=f"{user.name} submitted {request_type} request from {payload.request_from_date} to {payload.request_to_date}",
                 client=tx,
             )
-            return row.id
+
+            # Email delivery happens after the DB transaction commits (parity with safer side effects).
+            request_id = row.id
+            manager_ids = sorted({manager_id for manager_id, _ in manager_scope})
+
+        manager_emails: list[str] = []
+        for manager_id in manager_ids:
+            manager = await self.user_repo.get_by_id(manager_id)
+            if manager and manager.email:
+                manager_emails.append(manager.email)
+
+        to_recipients = ["applyleave@webknot.in", *manager_emails]
+        to_string = ";".join(to_recipients)
+        subject = f"{request_type} Applied by {user.name}"
+        reason = payload.comments if payload.comments is not None else "null"
+        body = USER_REQUEST_SUBMIT % (
+            "Manager",
+            user.name,
+            request_type,
+            reason,
+            payload.request_from_date,
+            payload.request_to_date,
+        )
+
+        try:
+            await self.email_service.send_email(
+                to=to_string,
+                subject=subject,
+                body=body,
+                cc=user.email,
+                is_html=True,
+            )
+        except Exception:  # noqa: BLE001
+            # Email delivery is a side effect; don't break request creation.
+            pass
+
+        return request_id
 
     async def list_requests(
         self,
@@ -571,7 +610,38 @@ class UserRequestService:
                 message=f"Your {row.request_type} request was {action.lower()}",
                 client=tx,
             )
-            return row.id
+
+            # Capture email details; sending is a side effect after commit.
+            request_id = row.id
+            requestor_email = row.user.email if row.user else ""
+            requestor_name = row.user.name if row.user else ""
+            request_type_value = request_type
+            request_from_date = row.request_from_date
+            request_to_date = row.request_to_date
+
+        try:
+            subject = f"{request_type_value} {action} for {requestor_name}"
+            body = USER_REQUEST_STATUS_UPDATE % (
+                requestor_name,
+                request_type_value.lower(),
+                action.lower(),
+                request_type_value,
+                request_from_date,
+                request_to_date,
+                approver.name,
+            )
+            await self.email_service.send_email(
+                to=requestor_email,
+                subject=subject,
+                body=body,
+                cc="applyleave@webknot.in",
+                is_html=True,
+            )
+        except Exception:  # noqa: BLE001
+            # Email delivery is a side effect; don't break request status updates.
+            pass
+
+        return request_id
 
     async def update_request(self, actor_email: str, payload: UserRequestUpdate) -> int:
         self._validate_request_payload(payload)
