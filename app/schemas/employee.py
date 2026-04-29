@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
-from app.domain.work_profile import WORK_LOCATION_TYPE_VALUES, normalize_choice
+from app.domain.work_profile import DELIVERY_STATUS_VALUES, WORK_LOCATION_TYPE_VALUES, normalize_choice
 
 
 class SecondarySkillRating(BaseModel):
@@ -31,6 +31,7 @@ class UserOnboardCreate(BaseModel):
     name: str
     user_type: Literal["FULLTIME", "INTERN", "CONSULTANT"]
     department: str
+    delivery_status: str
     phone_number: str
     work_mode: str
     work_location_type: str
@@ -39,6 +40,11 @@ class UserOnboardCreate(BaseModel):
     doj: date | None = None
     doi: date | None = None
     internship_duration: int | None = None
+
+    @field_validator("delivery_status", mode="before")
+    @classmethod
+    def validate_delivery_status(cls, value):
+        return normalize_choice(value, DELIVERY_STATUS_VALUES, "delivery_status")
 
     @field_validator("work_location_type", mode="before")
     @classmethod

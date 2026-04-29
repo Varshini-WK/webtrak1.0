@@ -8,6 +8,8 @@ from openpyxl import load_workbook
 from app.domain.allocation_rules import AllocationType
 from app.domain.notification_types import NotificationType
 from app.domain.work_profile import WORK_LOCATION_TYPE_VALUES, normalize_choice
+from app.domain.email_templates import ONBOARD_INVITE
+from app.domain.message_constants import ONBOARD_INVITE_SUBJECT
 from app.repositories.designation_repository import DesignationRepository
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.leave_repository import LeaveRepository
@@ -24,6 +26,7 @@ from app.schemas.employee import (
     UserOnboardUpdate,
 )
 from app.services.notification_service import NotificationService
+from app.services.email_service import EmailService
 
 
 class EmployeeService:
@@ -65,6 +68,7 @@ class EmployeeService:
         self.profile_repo = ProfileRepository(db)
         self.leave_repo = LeaveRepository(db)
         self.notification_service = NotificationService(db)
+        self.email_service = EmailService()
 
     def _to_file_url(self, file: UploadFile) -> str:
         timestamp = int(datetime.now(UTC).timestamp())
@@ -103,9 +107,11 @@ class EmployeeService:
             return 0.0, 1.5
         return 0.0, 0.0
 
-    def _send_onboarding_invite(self, email: str, name: str) -> None:
-        # Mail adapter placeholder. Non-blocking side effect.
-        _ = (email, name)
+    async def _send_onboarding_invite(self, email: str, name: str) -> None:
+        # Java-parity onboarding invite email.
+        subject = ONBOARD_INVITE_SUBJECT
+        body = ONBOARD_INVITE % name
+        await self.email_service.send_email(to=email, subject=subject, body=body, cc=None, is_html=True)
 
     @staticmethod
     def _normalize_header(value: Any) -> str:
@@ -320,6 +326,7 @@ class EmployeeService:
                     "name": payload.name,
                     "userType": payload.user_type,
                     "department": payload.department,
+                    "deliveryStatus": payload.delivery_status,
                     "phoneNumber": payload.phone_number,
                     "workMode": payload.work_mode,
                     "workLocationType": payload.work_location_type,
@@ -344,7 +351,7 @@ class EmployeeService:
             start_date = self._as_utc_datetime(today)
             await self.employee_repo.create_bench_allocation(user.id, payload.role, start_date, client=transaction)
 
-        self._send_onboarding_invite(user.email, user.name)
+        await self._send_onboarding_invite(user.email, user.name)
         await self.notification_service.send_notification(
             receiver_id=user.id,
             sender_id=None,

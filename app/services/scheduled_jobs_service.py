@@ -5,13 +5,17 @@ from datetime import UTC, date, datetime, time, timedelta
 import logging
 from time import perf_counter
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 
 from app.models.leave_mapping import LeaveMapping
 from app.domain.notification_types import NotificationType
 from app.models.role import Role
+from app.models.user import User
 from app.models.user_role import UserRole
 from app.models.user_request_tracking import UserRequestTracking
+from app.models.allocation import Allocation
+from app.models.project import Project
+from app.models.timelog import TimeLog
 from app.repositories.allocation_repository import AllocationRepository
 from app.repositories.leave_repository import LeaveRepository
 from app.repositories.notification_repository import NotificationRepository
@@ -20,6 +24,12 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.user_request_repository import UserRequestRepository
 from app.repositories.user_request_tracking_repository import UserRequestTrackingRepository
 from app.services.notification_service import NotificationService
+from app.services.email_service import EmailService
+from app.domain.email_templates import LEAVE_APPROVAL_REMAINDER, NO_TIME_LOGS
+from app.domain.message_constants import (
+    LEAVE_APPROVAL_REMAINDER_SUBJECT,
+    NO_TIME_LOGS_SUBJECT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +71,7 @@ class ScheduledJobsService:
         self.notification_repo = NotificationRepository(db)
         self.notification_service = NotificationService(db)
         self.timelog_repo = TimeLogRepository(db)
+        self.email_service = EmailService()
 
     async def send_timelog_defaults_notifications(self) -> int:
         interval = 3
@@ -86,7 +97,91 @@ class ScheduledJobsService:
                 message=f"You have logged {logged_hours:.1f}h across the last {len(days)} working days.",
             )
             sent += 1
+
+        # Java-parity: also send per-user-per-project emails with cc=project manager.
+        # We keep the existing in-app notification behavior unchanged.
+        try:
+            await self._send_no_time_logs_emails(days=days, interval=interval)
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to send time-log reminder emails")
+
         return sent
+
+    async def _send_no_time_logs_emails(self, *, days: list[date], interval: int) -> None:
+        if not days:
+            return
+
+        today = date.today()
+        sent = 0
+
+        # Select active IN_HOUSE allocations and compute logged hours per user+project for those days.
+        # Java query also filters allocations by end_date (null or >= CURRENT_DATE).
+        async with self.db.session() as session:
+            alloc_stmt = (
+                select(
+                    Allocation.user_id,
+                    Allocation.project_id,
+                    Allocation.allocated_hours,
+                    User.email,
+                    User.name,
+                    Project.project_name,
+                )
+                .select_from(Allocation)
+                .join(User, Allocation.user_id == User.id)
+                .join(Project, Allocation.project_id == Project.id)
+                .where(
+                    Project.project_type == "IN_HOUSE",
+                    Allocation.is_active.is_(True),
+                    or_(Allocation.end_date.is_(None), Allocation.end_date >= today),
+                )
+            )
+            alloc_rows = list((await session.execute(alloc_stmt)).all())
+
+            for row in alloc_rows:
+                user_id = int(row[0])
+                project_id = int(row[1])
+                allocated_hours = float(row[2] or 0.0)
+                user_email = str(row[3])
+                user_name = str(row[4])
+                project_name = str(row[5])
+
+                sum_stmt = (
+                    select(func.coalesce(func.sum(TimeLog.logged_hours), 0.0))
+                    .where(
+                        TimeLog.user_id == user_id,
+                        TimeLog.project_id == project_id,
+                        TimeLog.log_date.in_(days),
+                    )
+                )
+                logged_hours = float((await session.scalar(sum_stmt)) or 0.0)
+                if logged_hours >= allocated_hours * float(interval):
+                    continue
+
+                # Manager emails for this project (may be multiple).
+                mgr_stmt = (
+                    select(User.email)
+                    .select_from(UserRole)
+                    .join(Role, UserRole.role_id == Role.id)
+                    .join(User, UserRole.user_id == User.id)
+                    .where(
+                        UserRole.project_id == project_id,
+                        Role.name.in_(["ROLE_MANAGER", "MANAGER"]),
+                    )
+                    .distinct()
+                )
+                manager_emails = [r for r in (await session.scalars(mgr_stmt)).all() if r]
+                body = NO_TIME_LOGS % (user_name, project_name, interval, logged_hours)
+                for manager_email in manager_emails:
+                    await self.email_service.send_email(
+                        to=user_email,
+                        subject=NO_TIME_LOGS_SUBJECT,
+                        body=body,
+                        cc=manager_email,
+                        is_html=True,
+                    )
+                    sent += 1
+
+        logger.info("Sent %s NO_TIME_LOGS emails", sent)
 
     async def send_internship_completion_notifications(self) -> int:
         today = date.today()
@@ -262,6 +357,25 @@ class ScheduledJobsService:
                         message=f"Approval pending for request #{req.id}.",
                         client=tx,
                     )
+
+                    # Java-parity: send manager email, cc requestor email.
+                    try:
+                        manager = await self.user_repo.get_by_id(manager_id)
+                        if manager:
+                            requestor_email = req.user.email
+                            requestor_name = req.user.name
+                            subject = LEAVE_APPROVAL_REMAINDER_SUBJECT % requestor_name
+                            body = LEAVE_APPROVAL_REMAINDER % ("Manager", requestor_name)
+                            await self.email_service.send_email(
+                                to=manager.email,
+                                subject=subject,
+                                body=body,
+                                cc=requestor_email,
+                                is_html=True,
+                            )
+                    except Exception:  # noqa: BLE001
+                        logger.exception("Failed to send leave approval reminder email")
+
                     sent += 1
             await tx.flush()
         return sent

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import and_, select
 
 from app.api.allocation import router as allocation_router
@@ -22,6 +23,13 @@ from app.models import Project, Role, UserRole
 
 
 app = FastAPI(title="Webtrak Backend", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(employee_router, prefix="/api/v1", tags=["employee"])
 app.include_router(leave_reporting_router, prefix="/api/v1", tags=["leave-reporting"])
