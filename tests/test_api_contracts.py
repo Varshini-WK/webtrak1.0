@@ -41,6 +41,21 @@ def test_expected_reporting_import_routes_present() -> None:
     assert "/api/v1/upload/user-data" in paths
     assert "/api/v1/user/batch" in paths
     assert "/api/v1/leave-summary" in paths
+    assert "/api/v1/reports/workforce/headcount-distribution" in paths
+    assert "/api/v1/reports/workforce/role-wise-billed" in paths
+    assert "/api/v1/reports/workforce/experience" in paths
+    assert "/api/v1/reports/utilization/utilization-by-department" in paths
+    assert "/api/v1/reports/utilization/bench-aging" in paths
+    assert "/api/v1/reports/skill-capacity/skill-inventory" in paths
+    assert "/api/v1/reports/compliance/contract-distribution" in paths
+    assert "/api/v1/reports/attrition/overall-percent" in paths
+    assert "/api/v1/reports/attrition/voluntary-involuntary" in paths
+    assert "/api/v1/reports/attrition/role-wise" in paths
+    assert "/api/v1/reports/attrition/manager-wise" in paths
+    assert "/api/v1/reports/attrition/critical-skill" in paths
+    assert "/api/v1/reports/attrition/regretted" in paths
+    assert "/api/v1/reports/attrition/average-tenure" in paths
+    assert "/api/v1/reports/attrition/{emp_id}" in paths
 
 
 def test_expected_notification_routes_present() -> None:
@@ -51,3 +66,34 @@ def test_expected_notification_routes_present() -> None:
     assert "/api/v1/notifications/announcement" in paths
     assert "/api/v1/notifications/subscribe" in paths
     assert "/api/v1/notifications/delete" in paths
+
+
+def test_expected_learning_routes_present() -> None:
+    paths = {route.path for route in app.routes}
+    assert "/api/v1/trainings" in paths
+    assert "/api/v1/trainings/{training_id}" in paths
+    assert "/api/v1/trainings/{training_id}/trainers" in paths
+    assert "/api/v1/trainings/{training_id}/trainers/{trainer_user_id}" in paths
+    assert "/api/v1/trainings/{training_id}/sessions" in paths
+    assert "/api/v1/trainings/{training_id}/participants" in paths
+    assert "/api/v1/trainings/{training_id}/participants/{user_id}" in paths
+    assert "/api/v1/trainings/{training_id}/enroll" in paths
+    assert "/api/v1/trainings/open" in paths
+
+
+def test_expected_policy_routes_present() -> None:
+    paths = {route.path for route in app.routes}
+    assert "/api/v1/policies" in paths
+    assert "/api/v1/policies/{policy_id}/publish" in paths
+    assert "/api/v1/policies/{policy_id}/compliance" in paths
+    assert "/api/v1/policies/my" in paths
+    assert "/api/v1/policies/{policy_id}/viewed" in paths
+    assert "/api/v1/policies/{policy_id}/signed-copy" in paths
+    assert "/api/v1/policies/{policy_id}/signed-documents" in paths
+    assert "/api/v1/policies/{policy_id}/signed-documents/export" in paths
+
+
+def test_expected_bgv_routes_present() -> None:
+    paths = {route.path for route in app.routes}
+    assert "/api/v1/bgv" in paths
+    assert "/api/v1/bgv/{emp_id}" in paths

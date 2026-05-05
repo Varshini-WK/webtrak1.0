@@ -16,6 +16,7 @@ from app.api.access import require_any_role
 from app.core.database import get_db
 from app.schemas.reference import (
     BandListItem,
+    DepartmentListItem,
     DesignationResponse,
     KpiDefinitionCreate,
     KpiDefinitionResponse,
@@ -237,3 +238,12 @@ async def list_designations(
 ) -> list[DesignationResponse]:
     require_any_role(request, _READ_ROLES)
     return await svc.list_designations(band_id, department)
+
+
+@router.get("/masters/departments", response_model=list[DepartmentListItem])
+async def list_departments(
+    request: Request,
+    svc: ReferenceService = Depends(_svc),
+) -> list[DepartmentListItem]:
+    require_any_role(request, _READ_ROLES)
+    return await svc.list_departments()

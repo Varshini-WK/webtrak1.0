@@ -89,6 +89,27 @@ def start_scheduler(*, db, timezone: str = "UTC") -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        service.mark_policy_overdue_pending,
+        trigger=CronTrigger(second=0, minute=15, hour="*"),
+        id="policy_mark_pending_hourly",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        service.remind_policy_pending_signatures,
+        trigger=CronTrigger(second=0, minute=0, hour=10, day="*", month="*", day_of_week="*"),
+        id="policy_pending_reminder_daily",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        service.send_training_session_reminders,
+        trigger=CronTrigger(second=0, minute=0, hour="*/1", day="*", month="*", day_of_week="*"),
+        id="training_session_reminder_hourly",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info("Scheduler started with %s jobs", len(scheduler.get_jobs()))
     _scheduler = scheduler

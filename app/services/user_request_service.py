@@ -448,12 +448,15 @@ class UserRequestService:
                 page=page,
                 size=size,
             )
+            visible_rows = [row for row in rows if row.user_id != actor.id]
+            excluded_count = max(0, len(rows) - len(visible_rows))
+            visible_total = max(0, total - excluded_count)
             return UserRequestListResponse(
                 current_page=page,
-                total_pages=(total + size - 1) // size if size else 0,
+                total_pages=(visible_total + size - 1) // size if size else 0,
                 page_size=size,
-                total_elements=total,
-                data=[self._to_out(r) for r in rows],
+                total_elements=visible_total,
+                data=[self._to_out(r) for r in visible_rows],
             )
         else:
             target_ids = [actor.id]

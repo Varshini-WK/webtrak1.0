@@ -5,10 +5,15 @@ from sqlalchemy import and_, select
 from app.api.allocation import router as allocation_router
 from app.api.allocation_extension import router as allocation_extension_router
 from app.api.auth import router as auth_router
+from app.api.bgv import router as bgv_router
 from app.api.employee import router as employee_router
+from app.api.learning import router as learning_router
 from app.api.leave_reporting import router as leave_reporting_router
 from app.api.notification import router as notification_router
 from app.api.project import router as project_router
+from app.api.policy import router as policy_router
+from app.api.attrition_reporting import router as attrition_reporting_router
+from app.api.reporting import router as reporting_router
 from app.api.role import router as role_router
 from app.api.scheduler import router as scheduler_router
 from app.api.timelog import router as timelog_router
@@ -24,6 +29,7 @@ from app.models import Project, Role, UserRole
 app = FastAPI(title="Webtrak Backend", version="0.1.0")
 app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(employee_router, prefix="/api/v1", tags=["employee"])
+app.include_router(learning_router, prefix="/api/v1", tags=["learning"])
 app.include_router(leave_reporting_router, prefix="/api/v1", tags=["leave-reporting"])
 app.include_router(notification_router, prefix="/api/v1", tags=["notification"])
 app.include_router(project_router, prefix="/api/v1", tags=["project"])
@@ -34,6 +40,10 @@ app.include_router(user_request_router, prefix="/api/v1", tags=["user-request"])
 app.include_router(allocation_extension_router, prefix="/api/v1", tags=["allocation-extension"])
 app.include_router(reference_router, prefix="/api/v1", tags=["reference"])
 app.include_router(scheduler_router, prefix="/api/v1", tags=["scheduler"])
+app.include_router(reporting_router, prefix="/api/v1", tags=["reporting"])
+app.include_router(attrition_reporting_router, prefix="/api/v1", tags=["attrition-reporting"])
+app.include_router(policy_router, prefix="/api/v1", tags=["policy"])
+app.include_router(bgv_router, prefix="/api/v1", tags=["bgv"])
 
 
 def _custom_openapi():

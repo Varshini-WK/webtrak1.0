@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.models.designation import Designation
 
@@ -28,3 +28,13 @@ class DesignationRepository:
                 .limit(1)
             )
             return (await session.scalar(stmt)) is not None
+
+    async def list_unique_departments(self) -> list[str]:
+        async with self.db.session() as session:
+            stmt = (
+                select(func.distinct(func.trim(Designation.department)))
+                .where(Designation.department.is_not(None), func.trim(Designation.department) != "")
+                .order_by(func.trim(Designation.department).asc())
+            )
+            rows = (await session.scalars(stmt)).all()
+            return [str(row) for row in rows if row is not None]

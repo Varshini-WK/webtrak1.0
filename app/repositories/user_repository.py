@@ -19,6 +19,20 @@ class UserRepository:
         async with self.db.session() as session:
             return await session.get(User, user_id)
 
+    async def get_by_emp_id(self, emp_id: str):
+        async with self.db.session() as session:
+            return await session.scalar(select(User).where(User.emp_id == emp_id))
+
+    async def map_names_by_user_ids(self, user_ids: list[int]) -> dict[int, str]:
+        """Return ``user_id -> display name`` for known users (omit missing ids)."""
+        if not user_ids:
+            return {}
+        uniq = sorted(set(user_ids))
+        async with self.db.session() as session:
+            stmt = select(User.id, User.name).where(User.id.in_(uniq))
+            rows = (await session.execute(stmt)).all()
+        return {int(r[0]): ((r[1] or "").strip() or f"User {int(r[0])}") for r in rows}
+
     async def create_or_get_oauth_user(self, email: str, name: str):
         user = await self.get_by_email(email)
         if user:

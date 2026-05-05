@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import date
 
 from pydantic import BaseModel, Field
 
@@ -37,6 +38,9 @@ class ProjectSimpleListResponse(BaseModel):
 class ProjectCodeNameResponse(BaseModel):
     project_code: str
     project_name: str
+    role: str | None = None
+    allocated_hours: int | None = None
+    start_date: date | None = None
 
 
 class ProjectWithEmployeesResponse(BaseModel):

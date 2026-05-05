@@ -131,11 +131,29 @@ class ProjectService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         allocations = await self.repo.get_active_allocations_for_user(user.id)
-        project_codes = sorted({row.projectCode for row in allocations if row.projectCode and row.projectCode not in SYSTEM_PROJECT_CODES})
+        latest_by_code: dict[str, object] = {}
+        for row in allocations:
+            code = row.projectCode
+            if not code or code in SYSTEM_PROJECT_CODES:
+                continue
+            existing = latest_by_code.get(code)
+            if existing is None:
+                latest_by_code[code] = row
+                continue
+            if getattr(row, "startDate", None) and getattr(existing, "startDate", None) and row.startDate > existing.startDate:
+                latest_by_code[code] = row
+
+        project_codes = sorted(latest_by_code.keys())
         projects = await self.repo.get_projects_by_codes(project_codes)
         by_code = {project.projectCode: project for project in projects}
 
         return [
-            ProjectCodeNameResponse(project_code=code, project_name=by_code[code].projectName if code in by_code else code)
+            ProjectCodeNameResponse(
+                project_code=code,
+                project_name=by_code[code].projectName if code in by_code else code,
+                role=(latest_by_code[code].role or None),
+                allocated_hours=int(latest_by_code[code].allocatedHours),
+                start_date=latest_by_code[code].startDate,
+            )
             for code in project_codes
         ]

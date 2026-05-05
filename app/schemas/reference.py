@@ -23,8 +23,12 @@ class Department(StrEnum):
 class BandListItem(BaseModel):
     id: int
     name: str
-    stream: str | None = None
-    designation: str | None = None
+    # stream: str | None = None
+    # designation: str | None = None
+
+
+class DepartmentListItem(BaseModel):
+    name: str
 
 
 # --- KPI definitions ---
