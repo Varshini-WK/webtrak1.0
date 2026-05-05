@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     cookie_domain: str | None = None
 
+    # SMTP configuration for email delivery (used by the Java-parity EmailService).
+    # When `app_env` is not `prod`, recipients are redirected to `smtp_sender`
+    # to prevent accidental email delivery to real users.
+ 
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = "varshini.k@webknot.in"
+    smtp_password: str = "ueoj wslc cqqu sogt"
+    smtp_use_tls: bool = True
+    smtp_sender: str = "varshini.k@webknot.in"
+
 
 @lru_cache
 def get_settings() -> Settings:
