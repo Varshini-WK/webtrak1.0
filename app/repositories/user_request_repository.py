@@ -147,7 +147,11 @@ class UserRequestRepository:
         to_date: date | None = None,
     ):
         async with self.db.session() as session:
-            filters = [UserRequest.deleted.is_(False), UserRequest.request_type == request_type]
+            filters = [
+                UserRequest.deleted.is_(False),
+                UserRequest.request_type == request_type,
+                UserRequest.user_id != manager_user_id,
+            ]
             if request_type == "COMP_OFF":
                 filters.append(UserRequest.manager_comp_off_email == manager_email)
             if from_date:
@@ -165,11 +169,12 @@ class UserRequestRepository:
                 .limit(size)
             )
             rows = list((await session.scalars(stmt)).all())
+            if request_type != "COMP_OFF":
+                return rows, total
             filtered = [
                 row
                 for row in rows
-                if request_type != "COMP_OFF"
-                or any(t.actioner_id == manager_user_id for t in row.trackings if t.action in {"INITIATED", "APPROVED", "REJECTED"})
+                if any(t.actioner_id == manager_user_id for t in row.trackings if t.action in {"INITIATED", "APPROVED", "REJECTED"})
             ]
             return filtered, total
 

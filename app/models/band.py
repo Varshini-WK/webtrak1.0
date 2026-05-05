@@ -9,8 +9,8 @@ class Band(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    stream: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    designation: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # stream: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # designation: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     users = relationship("User", back_populates="band")
     kpi_definitions = relationship("KpiDefinition", back_populates="band")

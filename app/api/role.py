@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
-from app.api.access import get_actor_email, get_actor_roles
+from app.api.access import get_actor_email, get_actor_roles, require_any_role
 from app.core.database import get_db
 from app.core.settings import get_settings
 from app.schemas.common import GenericResponse
@@ -19,6 +19,13 @@ def _resolve_actor(request: Request) -> tuple[str, set[str]]:
         raise
 
 
+def _require_hr_or_admin_unless_bootstrap(request: Request, bootstrap_key: str | None, configured_bootstrap_key: str) -> None:
+    is_bootstrap = bool(configured_bootstrap_key and bootstrap_key and bootstrap_key == configured_bootstrap_key)
+    if is_bootstrap:
+        return
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
+
+
 @router.post("/roles/assign", response_model=AssignRoleResponse)
 async def assign_role(
     payload: AssignRoleRequest,
@@ -27,6 +34,7 @@ async def assign_role(
     db=Depends(get_db),
 ) -> AssignRoleResponse:
     settings = get_settings()
+    _require_hr_or_admin_unless_bootstrap(request, x_admin_bootstrap_key, settings.admin_bootstrap_key)
     actor_email, actor_roles = _resolve_actor(request)
     tool = RoleTool(db)
     return await tool.assign_role(
@@ -46,6 +54,7 @@ async def assign_role_java_contract(
     db=Depends(get_db),
 ) -> GenericResponse:
     settings = get_settings()
+    _require_hr_or_admin_unless_bootstrap(request, x_admin_bootstrap_key, settings.admin_bootstrap_key)
     actor_email, actor_roles = _resolve_actor(request)
     tool = RoleTool(db)
     result = await tool.assign_role(

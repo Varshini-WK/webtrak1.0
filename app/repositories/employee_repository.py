@@ -139,7 +139,7 @@ class EmployeeRepository:
         filters = []
         if search:
             term = f"%{search}%"
-            filters.append(or_(User.name.ilike(term), User.email.ilike(term)))
+            filters.append(or_(User.name.ilike(term), User.email.ilike(term), User.emp_id.ilike(term)))
         if user_type:
             filters.append(User.user_type == user_type)
         if onboarding_status:

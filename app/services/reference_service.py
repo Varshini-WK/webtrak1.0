@@ -38,8 +38,8 @@ class ReferenceService:
             schemas.BandListItem(
                 id=row.id,
                 name=row.name,
-                stream=row.stream,
-                designation=row.designation,
+                # stream=row.stream,
+                # designation=row.designation,
             )
             for row in rows
         ]
@@ -313,3 +313,7 @@ class ReferenceService:
     async def list_designations(self, band_id: int, department: str) -> list[schemas.DesignationResponse]:
         rows = await self.designations.list_by_band_and_department(band_id, department.strip())
         return [schemas.DesignationResponse.model_validate(r) for r in rows]
+
+    async def list_departments(self) -> list[schemas.DepartmentListItem]:
+        rows = await self.designations.list_unique_departments()
+        return [schemas.DepartmentListItem(name=row) for row in rows]

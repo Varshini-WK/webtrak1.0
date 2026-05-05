@@ -38,7 +38,7 @@ async def get_all_projects(
     search: str | None = None,
     db=Depends(get_db),
 ) -> GenericResponse:
-    require_any_role(request, {"ROLE_HR"})
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
     result = await ProjectTool(db).get_all_projects(page=page, size=size, search=search)
     return GenericResponse(message="success", data=result.model_dump())
 
@@ -49,7 +49,7 @@ async def get_all_projects_without_pagination(
     search: str | None = None,
     db=Depends(get_db),
 ) -> GenericResponse:
-    require_any_role(request, {"ROLE_HR"})
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
     result = await ProjectTool(db).get_all_projects_without_pagination(search=search)
     return GenericResponse(message="success", data=result.model_dump())
 
@@ -60,7 +60,7 @@ async def get_project(
     projectCode: str = Query(...),
     db=Depends(get_db),
 ) -> GenericResponse:
-    require_any_role(request, {"ROLE_HR"})
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
     result = await ProjectTool(db).get_project_by_code(projectCode)
     return GenericResponse(message="success", data=result.model_dump())
 

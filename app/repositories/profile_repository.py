@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,15 @@ def _map_profile_keys(data: dict) -> dict:
     }
     return {keymap.get(k, k): v for k, v in data.items()}
 
+
+def _to_json_safe(value):
+    if isinstance(value, BaseModel):
+        return value.model_dump()
+    if isinstance(value, list):
+        return [_to_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {k: _to_json_safe(v) for k, v in value.items()}
+    return value
 
 def _map_user_keys(data: dict) -> dict:
     keymap = {

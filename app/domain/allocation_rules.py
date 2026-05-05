@@ -106,7 +106,12 @@ def max_daily_hours_non_bench(
     for a in allocations:
         if not getattr(a, "isActive", True):
             continue
-        code = getattr(a, "projectCode", None) or getattr(a, "project_code", None)
+        code = getattr(a, "project_code", None)
+        if code is None:
+            try:
+                code = getattr(a, "projectCode", None)
+            except Exception:
+                code = None
         if code == BENCH_PROJECT_CODE:
             continue
         s = as_date(getattr(a, "startDate", None) or getattr(a, "start_date", None))

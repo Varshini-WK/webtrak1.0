@@ -24,6 +24,8 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.user_request_repository import UserRequestRepository
 from app.repositories.user_request_tracking_repository import UserRequestTrackingRepository
 from app.services.notification_service import NotificationService
+from app.services.policy_service import PolicyService
+from app.services.learning_service import LearningService
 from app.services.email_service import EmailService
 from app.domain.email_templates import LEAVE_APPROVAL_REMAINDER, NO_TIME_LOGS
 from app.domain.message_constants import (
@@ -70,7 +72,9 @@ class ScheduledJobsService:
         self.leave_repo = LeaveRepository(db)
         self.notification_repo = NotificationRepository(db)
         self.notification_service = NotificationService(db)
+        self.policy_service = PolicyService(db)
         self.timelog_repo = TimeLogRepository(db)
+        self.learning_service = LearningService(db)
         self.email_service = EmailService()
 
     async def send_timelog_defaults_notifications(self) -> int:
@@ -427,6 +431,15 @@ class ScheduledJobsService:
         logger.info("Deleted read notifications count=%s", deleted)
         return deleted
 
+    async def mark_policy_overdue_pending(self) -> int:
+        return await self.policy_service.mark_overdue_pending()
+
+    async def remind_policy_pending_signatures(self) -> int:
+        return await self.policy_service.send_pending_reminders()
+
+    async def send_training_session_reminders(self) -> int:
+        return await self.learning_service.send_training_reminders()
+
     async def run_all_jobs(self) -> dict:
         jobs: list[tuple[str, callable]] = [
             ("send_timelog_defaults_notifications", self.send_timelog_defaults_notifications),
@@ -436,6 +449,9 @@ class ScheduledJobsService:
             ("remind_leave_approval", self.remind_leave_approval),
             ("auto_approve_leave_if_manager_not_approved", self.auto_approve_leave_if_manager_not_approved),
             ("delete_read_notifications", self.delete_read_notifications),
+            ("mark_policy_overdue_pending", self.mark_policy_overdue_pending),
+            ("remind_policy_pending_signatures", self.remind_policy_pending_signatures),
+            ("send_training_session_reminders", self.send_training_session_reminders),
         ]
         results: list[JobRunResult] = []
         for name, fn in jobs:

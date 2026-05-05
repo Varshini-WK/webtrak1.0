@@ -12,3 +12,4 @@ def test_master_routes_registered() -> None:
     assert "/api/v1/masters/submission-cycles/by-key" in paths
     assert "/api/v1/masters/submission-cycles/{cycle_id}" in paths
     assert "/api/v1/masters/designations" in paths
+    assert "/api/v1/masters/departments" in paths

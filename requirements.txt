@@ -13,3 +13,5 @@ pytest
 openpyxl
 python-multipart
 apscheduler
+
+pydantic
