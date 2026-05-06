@@ -1,10 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
-from app.api.access import get_actor_email, require_any_role
+from app.api.access import require_any_role
 from app.core.database import get_db
-from app.schemas.attrition import AttritionUpsertRequest
 from app.schemas.common import GenericResponse
 from app.tools.reporting_tool import ReportingTool
 
@@ -97,14 +96,3 @@ async def attrition_average_tenure(
     return GenericResponse(message="attrition average tenure (5.6) fetched successfully", data=result.model_dump())
 
 
-@router.post("/reports/attrition/{emp_id}", response_model=GenericResponse)
-async def attrition_upsert(
-    emp_id: str,
-    request: Request,
-    payload: AttritionUpsertRequest = Body(...),
-    db=Depends(get_db),
-) -> GenericResponse:
-    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
-    actor_email = get_actor_email(request)
-    result = await _attrition_tool(db).attrition_upsert(actor_email=actor_email, emp_id=emp_id, payload=payload)
-    return GenericResponse(message="attrition record saved successfully", data=result.model_dump())

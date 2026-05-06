@@ -4,6 +4,7 @@ from app.main import app
 def test_expected_employee_routes_present() -> None:
     paths = {route.path for route in app.routes}
     assert "/api/v1/user/onboard" in paths
+    assert "/api/v1/user/offboard/{emp_id}" in paths
     assert "/api/v1/profile" in paths
     assert "/api/v1/employee-profile/{empId}" in paths
 
@@ -55,7 +56,6 @@ def test_expected_reporting_import_routes_present() -> None:
     assert "/api/v1/reports/attrition/critical-skill" in paths
     assert "/api/v1/reports/attrition/regretted" in paths
     assert "/api/v1/reports/attrition/average-tenure" in paths
-    assert "/api/v1/reports/attrition/{emp_id}" in paths
 
 
 def test_expected_notification_routes_present() -> None:
@@ -79,21 +79,26 @@ def test_expected_learning_routes_present() -> None:
     assert "/api/v1/trainings/{training_id}/participants/{user_id}" in paths
     assert "/api/v1/trainings/{training_id}/enroll" in paths
     assert "/api/v1/trainings/open" in paths
+    assert "/api/v1/trainings/{training_id}/materials" in paths
+    assert "/api/v1/trainings/{training_id}/sessions/{training_session_id}/attendance" in paths
+    assert "/api/v1/trainings/{training_id}/assessments" in paths
+    assert "/api/v1/trainings/{training_id}/scores" in paths
+    assert "/api/v1/trainings/{training_id}/analytics" in paths
 
 
 def test_expected_policy_routes_present() -> None:
     paths = {route.path for route in app.routes}
-    assert "/api/v1/policies" in paths
-    assert "/api/v1/policies/{policy_id}/publish" in paths
-    assert "/api/v1/policies/{policy_id}/compliance" in paths
-    assert "/api/v1/policies/my" in paths
-    assert "/api/v1/policies/{policy_id}/viewed" in paths
-    assert "/api/v1/policies/{policy_id}/signed-copy" in paths
-    assert "/api/v1/policies/{policy_id}/signed-documents" in paths
-    assert "/api/v1/policies/{policy_id}/signed-documents/export" in paths
+    assert "/api/v1/reports/policies" in paths
+    assert "/api/v1/reports/policies/{policy_id}/publish" in paths
+    assert "/api/v1/reports/policies/{policy_id}/compliance" in paths
+    assert "/api/v1/reports/policies/my" in paths
+    assert "/api/v1/reports/policies/{policy_id}/viewed" in paths
+    assert "/api/v1/reports/policies/{policy_id}/signed-copy" in paths
+    assert "/api/v1/reports/policies/{policy_id}/signed-documents" in paths
+    assert "/api/v1/reports/policies/{policy_id}/signed-documents/export" in paths
 
 
 def test_expected_bgv_routes_present() -> None:
     paths = {route.path for route in app.routes}
-    assert "/api/v1/bgv" in paths
-    assert "/api/v1/bgv/{emp_id}" in paths
+    assert "/api/v1/reports/bgv" in paths
+    assert "/api/v1/reports/bgv/{emp_id}" in paths

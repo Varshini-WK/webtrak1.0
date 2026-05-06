@@ -20,4 +20,5 @@ class TrainingSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     training = relationship("Training", back_populates="sessions")
+    attendance_rows = relationship("TrainingAttendance", back_populates="session", cascade="all, delete-orphan")
 

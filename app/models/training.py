@@ -23,4 +23,6 @@ class Training(Base):
     trainers = relationship("TrainingTrainer", back_populates="training", cascade="all, delete-orphan")
     sessions = relationship("TrainingSession", back_populates="training", cascade="all, delete-orphan")
     participants = relationship("TrainingParticipant", back_populates="training", cascade="all, delete-orphan")
+    materials = relationship("TrainingMaterial", back_populates="training", cascade="all, delete-orphan")
+    assessments = relationship("TrainingAssessment", back_populates="training", cascade="all, delete-orphan")
 

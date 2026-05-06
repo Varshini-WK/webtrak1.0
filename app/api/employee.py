@@ -6,6 +6,7 @@ from app.api.access import get_actor_email, get_actor_roles, require_any_role
 from app.core.database import get_db
 from app.domain.notification_types import NotificationType
 from app.repositories.user_repository import UserRepository
+from app.schemas.attrition import AttritionUpsertRequest
 from app.schemas.common import GenericResponse
 from app.schemas.employee import (
     EmployeeProfileHrUpdate,
@@ -216,3 +217,16 @@ async def upload_users_batch(request: Request, file: UploadFile = File(...), db=
             message=f"Processed={result.get('processed', 0)}",
         )
     return GenericResponse(message="success", data=result)
+
+
+@router.post("/user/offboard/{emp_id}", response_model=GenericResponse)
+async def offboard_employee(
+    emp_id: str,
+    payload: AttritionUpsertRequest,
+    request: Request,
+    db=Depends(get_db),
+) -> GenericResponse:
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
+    actor_email = get_actor_email(request)
+    result = await EmployeeTool(db).offboard_employee(actor_email=actor_email, emp_id=emp_id, payload=payload)
+    return GenericResponse(message="employee offboarded successfully", data=result.model_dump())

@@ -83,3 +83,40 @@ class ParticipantOut(BaseModel):
 class ParticipantStatusUpdateRequest(BaseModel):
     enrollment_status: Literal["WITHDRAWN", "COMPLETED"]
 
+
+class MaterialCreateRequest(BaseModel):
+    title: str
+    material_url: str
+    visibility: Literal["HR_ONLY", "EMPLOYEE"] = "EMPLOYEE"
+
+
+class AttendanceMarkRequest(BaseModel):
+    user_id: int
+    attendance_status: Literal["PRESENT", "ABSENT"]
+
+
+class AssessmentCreateRequest(BaseModel):
+    name: str
+    description: str | None = None
+    weight_percent: int = Field(ge=1, le=100)
+
+
+class AssessmentCreateForm(BaseModel):
+    name: str
+    description: str | None = None
+    weight_percent: int = Field(ge=1, le=100)
+
+
+class ParticipantScoreUpsertRequest(BaseModel):
+    user_id: int
+    scores_json: dict[str, float]
+    mark_completed: bool = False
+
+
+class LearningAnalyticsOut(BaseModel):
+    training_id: int
+    enrolled_count: int
+    completed_count: int
+    average_score_percent: float
+    average_attendance_percent: float
+

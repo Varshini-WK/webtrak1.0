@@ -15,6 +15,7 @@ from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.leave_repository import LeaveRepository
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.allocation import AllocationCreateRequest
+from app.schemas.attrition import AttritionRecordResponse, AttritionUpsertRequest
 from app.schemas.employee import (
     EmployeeProfileHrUpdate,
     EmployeeProfileResponse,
@@ -27,6 +28,7 @@ from app.schemas.employee import (
 )
 from app.services.notification_service import NotificationService
 from app.services.email_service import EmailService
+from app.services.reporting_service import ReportingService
 
 
 class EmployeeService:
@@ -786,3 +788,6 @@ class EmployeeService:
         if errors:
             message = f"{message}; {len(errors)} row(s) skipped"
         return {"completed": completed, "message": message, "errors": errors[:50]}
+
+    async def offboard_employee(self, *, actor_email: str, emp_id: str, payload: AttritionUpsertRequest) -> AttritionRecordResponse:
+        return await ReportingService(self.db).upsert_attrition(actor_email=actor_email, emp_id=emp_id, payload=payload)
