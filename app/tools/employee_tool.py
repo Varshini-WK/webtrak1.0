@@ -1,5 +1,6 @@
 from fastapi import UploadFile
 
+from app.schemas.attrition import AttritionRecordResponse, AttritionUpsertRequest
 from app.schemas.employee import (
     EmployeeProfileHrUpdate,
     EmployeeProfileResponse,
@@ -79,3 +80,12 @@ class EmployeeTool:
 
     async def import_allocations_legacy(self, content: bytes, actor_roles: set[str]) -> dict[str, int | str | list[str]]:
         return await self.service.import_allocations_legacy(content, actor_roles)
+
+    async def offboard_employee(
+        self,
+        *,
+        actor_email: str,
+        emp_id: str,
+        payload: AttritionUpsertRequest,
+    ) -> AttritionRecordResponse:
+        return await self.service.offboard_employee(actor_email=actor_email, emp_id=emp_id, payload=payload)

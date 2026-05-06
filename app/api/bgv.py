@@ -9,7 +9,7 @@ from app.tools.bgv_tool import BgvTool
 router = APIRouter()
 
 
-@router.post("/bgv/{emp_id}", response_model=GenericResponse)
+@router.post("/reports/bgv/{emp_id}", response_model=GenericResponse)
 async def upsert_bgv(emp_id: str, payload: BgvUpsertRequest, request: Request, db=Depends(get_db)) -> GenericResponse:
     require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
     actor_email = get_actor_email(request)
@@ -17,14 +17,14 @@ async def upsert_bgv(emp_id: str, payload: BgvUpsertRequest, request: Request, d
     return GenericResponse(message="bgv record saved successfully", data=result.model_dump())
 
 
-@router.get("/bgv/{emp_id}", response_model=GenericResponse)
+@router.get("/reports/bgv/{emp_id}", response_model=GenericResponse)
 async def get_bgv(emp_id: str, request: Request, db=Depends(get_db)) -> GenericResponse:
     require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
     result = await BgvTool(db).get_record(emp_id=emp_id)
     return GenericResponse(message="bgv record fetched successfully", data=result.model_dump())
 
 
-@router.get("/bgv", response_model=GenericResponse)
+@router.get("/reports/bgv", response_model=GenericResponse)
 async def list_bgv(
     request: Request,
     page: int = Query(default=0, ge=0),

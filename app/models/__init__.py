@@ -23,7 +23,11 @@ from app.models.project import Project
 from app.models.refresh_token import RefreshToken
 from app.models.role import Role
 from app.models.timelog import TimeLog
+from app.models.training_assessment import TrainingAssessment
+from app.models.training_attendance import TrainingAttendance
 from app.models.training import Training
+from app.models.training_material import TrainingMaterial
+from app.models.training_participant_assessment import TrainingParticipantAssessment
 from app.models.training_participant import TrainingParticipant
 from app.models.training_session import TrainingSession
 from app.models.training_trainer import TrainingTrainer
@@ -50,7 +54,11 @@ __all__ = [
     "CompOffUsage",
     "Role",
     "TimeLog",
+    "TrainingAssessment",
+    "TrainingAttendance",
     "Training",
+    "TrainingMaterial",
+    "TrainingParticipantAssessment",
     "TrainingParticipant",
     "TrainingSession",
     "TrainingTrainer",
