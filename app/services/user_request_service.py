@@ -6,6 +6,7 @@ import re
 from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 
+from app.domain.allocation_rules import BENCH_PROJECT_CODE
 from app.models.allocation import Allocation
 from app.models.leave_mapping import LeaveMapping
 from app.models.project import Project
@@ -112,19 +113,24 @@ class UserRequestService:
     async def _is_user_on_bench(self, user_id: int) -> bool:
         today = date.today()
         async with self.db.session() as session:
-            active_allocs = (
-                await session.scalars(
-                    select(Allocation).where(
-                        Allocation.user_id == user_id,
-                        Allocation.is_active.is_(True),
-                        Allocation.start_date <= today,
-                        or_(Allocation.end_date.is_(None), Allocation.end_date >= today),
-                    )
-                )
-            ).all()
-        if not active_allocs:
-            return True
-        return all((alloc.projectCode or "").upper() == "BENCH" for alloc in active_allocs)
+            base_where = (
+                Allocation.user_id == user_id,
+                Allocation.is_active.is_(True),
+                Allocation.start_date <= today,
+                or_(Allocation.end_date.is_(None), Allocation.end_date >= today),
+            )
+
+            any_active_id = await session.scalar(select(Allocation.id).where(*base_where).limit(1))
+            if any_active_id is None:
+                return True
+
+            any_non_bench_id = await session.scalar(
+                select(Allocation.id)
+                .join(Project, Allocation.project_id == Project.id)
+                .where(*base_where, Project.project_code != BENCH_PROJECT_CODE)
+                .limit(1)
+            )
+            return any_non_bench_id is None
 
     async def _manager_scope_for_user(self, user_id: int, at_date: date, client) -> list[tuple[int, int | None]]:
         allocs = (
