@@ -183,7 +183,9 @@ class BatchAllocationRow(BaseModel):
 class AllocationResponse(BaseModel):
     id: int
     user_id: int
+    employee_name: str | None = None
     project_code: str
+    project_name: str | None = None
     role: str | None
     allocated_hours: int
     start_date: date
@@ -206,7 +208,9 @@ class AllocationResponse(BaseModel):
         return cls(
             id=row.id,
             user_id=row.userId,
+            employee_name=row.user.name if getattr(row, "user", None) else None,
             project_code=row.projectCode,
+            project_name=row.project.projectName if getattr(row, "project", None) else None,
             role=row.role,
             allocated_hours=row.allocatedHours,
             start_date=as_date(row.startDate) or date.today(),
