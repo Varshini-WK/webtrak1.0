@@ -146,6 +146,17 @@ class LearningRepository:
             stmt = select(TrainingParticipant).where(TrainingParticipant.training_id == training_id).order_by(TrainingParticipant.id.asc())
             return list((await session.scalars(stmt)).all())
 
+    async def list_participants_with_user_details(self, training_id: int) -> list[tuple[TrainingParticipant, str, str]]:
+        async with self.db.session() as session:
+            stmt = (
+                select(TrainingParticipant, User.name, User.email)
+                .join(User, TrainingParticipant.user_id == User.id)
+                .where(TrainingParticipant.training_id == training_id)
+                .order_by(TrainingParticipant.id.asc())
+            )
+            result = await session.execute(stmt)
+            return [(row[0], str(row[1]), str(row[2])) for row in result.all()]
+
     async def update_participant_status(self, training_id: int, user_id: int, enrollment_status: str, client=None) -> TrainingParticipant | None:
         if client is not None:
             row = await client.scalar(

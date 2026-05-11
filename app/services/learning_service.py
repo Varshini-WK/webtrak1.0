@@ -189,6 +189,25 @@ class LearningService:
             for row in rows
         ]
 
+    async def list_training_participants(self, training_id: int, *, actor_roles: set[str]):
+        self._require_hr(actor_roles)
+        training = await self.repo.get_training(training_id)
+        if not training:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Training not found")
+        rows = await self.repo.list_participants_with_user_details(training_id)
+        return [
+            {
+                "id": row.id,
+                "training_id": row.training_id,
+                "user_id": row.user_id,
+                "name": name,
+                "email": email,
+                "participant_source": row.participant_source,
+                "enrollment_status": row.enrollment_status,
+            }
+            for row, name, email in rows
+        ]
+
     async def remove_participant(self, training_id: int, user_id: int, *, actor_roles: set[str]):
         self._require_hr(actor_roles)
         deleted = await self.repo.remove_participant(training_id, user_id)
