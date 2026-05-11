@@ -84,6 +84,14 @@ async def list_sessions(training_id: int, request: Request, db=Depends(get_db)) 
     return GenericResponse(message="success", data=result)
 
 
+@router.get("/trainings/{training_id}/participants", response_model=GenericResponse)
+async def list_training_participants(training_id: int, request: Request, db=Depends(get_db)) -> GenericResponse:
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
+    service = LearningService(db)
+    result = await service.list_training_participants(training_id, actor_roles=get_actor_roles(request))
+    return GenericResponse(message="success", data=result)
+
+
 @router.post("/trainings/{training_id}/participants", response_model=GenericResponse)
 async def assign_participants(training_id: int, payload: ParticipantAssignRequest, request: Request, db=Depends(get_db)) -> GenericResponse:
     require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
