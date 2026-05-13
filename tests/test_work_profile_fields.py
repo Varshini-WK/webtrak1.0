@@ -74,11 +74,24 @@ def test_onboard_create_requires_doj_for_fulltime_and_consultant():
         )
 
 
+def test_onboard_update_requires_non_blank_name():
+    from app.schemas.employee import UserOnboardUpdate
+
+    with pytest.raises(ValidationError):
+        UserOnboardUpdate(
+            email="member@example.com",
+            name="   ",
+            primary_skills=[],
+            secondary_skills=[],
+        )
+
+
 def test_onboard_update_accepts_secondary_skills_with_rating():
     from app.schemas.employee import UserOnboardUpdate
 
     payload = UserOnboardUpdate(
         email="member@example.com",
+        name="Jane Doe",
         primary_skills=["Python"],
         secondary_skills=[{"skill": "React", "rating": 4}, {"skill": "Docker", "rating": 3}],
     )
@@ -91,6 +104,7 @@ def test_onboard_update_rejects_secondary_skill_without_rating():
     with pytest.raises(ValidationError):
         UserOnboardUpdate(
             email="member@example.com",
+            name="Jane Doe",
             primary_skills=["Python"],
             secondary_skills=[{"skill": "React"}],
         )

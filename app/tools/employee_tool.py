@@ -7,6 +7,7 @@ from app.schemas.employee import (
     OnboardListResponse,
     OnboardUserResponse,
     ProfileUpdateRequest,
+    RecentInvitedUsersResponse,
     UserOnboardCreate,
     UserOnboardUpdate,
 )
@@ -68,6 +69,9 @@ class EmployeeTool:
         onboarding_status: str | None,
     ) -> OnboardListResponse:
         return await self.service.get_onboarded_users(page, size, search, user_type, onboarding_status)
+
+    async def get_recent_invited_users(self) -> RecentInvitedUsersResponse:
+        return await self.service.get_recent_invited_users()
 
     async def import_leave_data(self, content: bytes) -> dict[str, int | str]:
         return await self.service.import_leave_data(content)

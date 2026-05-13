@@ -151,6 +151,7 @@ async def _seed_system_projects() -> None:
     defaults = [
         {"project_code": "BENCH", "project_name": "Bench", "project_type": "IN_HOUSE", "is_active": True},
         {"project_code": "GLOBAL", "project_name": "Global", "project_type": "IN_HOUSE", "is_active": True},
+        {"project_code": "TALENT_POOL", "project_name": "Talent Pool", "project_type": "IN_HOUSE", "is_active": True},
     ]
     async with db.tx() as session:
         for project in defaults:

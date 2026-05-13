@@ -72,6 +72,14 @@ async def update_user_onboard(
     return GenericResponse(message="success", data=result.model_dump())
 
 
+@router.get("/user/recent-invited", response_model=GenericResponse)
+async def get_recent_invited_users(request: Request, db=Depends(get_db)) -> GenericResponse:
+    require_any_role(request, {"ROLE_HR", "ROLE_ADMIN"})
+    tool = EmployeeTool(db)
+    result = await tool.get_recent_invited_users()
+    return GenericResponse(message="Recent invited employees fetched successfully", data=result.model_dump())
+
+
 @router.get("/user/onboard", response_model=GenericResponse)
 async def get_onboarded_users(
     request: Request,

@@ -4,6 +4,7 @@ from app.main import app
 def test_expected_employee_routes_present() -> None:
     paths = {route.path for route in app.routes}
     assert "/api/v1/user/onboard" in paths
+    assert "/api/v1/user/recent-invited" in paths
     assert "/api/v1/user/offboard/{emp_id}" in paths
     assert "/api/v1/profile" in paths
     assert "/api/v1/employee-profile/{empId}" in paths
@@ -13,6 +14,7 @@ def test_expected_allocation_routes_present() -> None:
     paths = {route.path for route in app.routes}
     assert "/api/v1/allocation" in paths
     assert "/api/v1/allocation/user" in paths
+    assert "/api/v1/allocation/bench-users" in paths
     assert "/api/v1/allocation/forecasting" in paths
     assert "/api/v1/allocation/{allocation_id}" in paths
     assert "/api/v1/allocation/batch" in paths

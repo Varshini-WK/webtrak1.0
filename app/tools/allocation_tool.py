@@ -4,6 +4,7 @@ from app.schemas.allocation import (
     AllocationRoleItem,
     AllocationResponse,
     AllocationUpdateRequest,
+    BenchEquivalentUsersResponse,
     ForecastAllocationResponse,
     UserAllocationItem,
 )
@@ -47,6 +48,15 @@ class AllocationTool:
             size=size,
             view=view,
         )
+
+    async def list_bench_equivalent_users(
+        self,
+        *,
+        search: str | None,
+        page: int,
+        size: int,
+    ) -> BenchEquivalentUsersResponse:
+        return await self.service.list_bench_equivalent_users(search=search, page=page, size=size)
 
     async def forecast(
         self,
