@@ -1,6 +1,7 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.employee_status import EmployeeStatus
 from app.models.allocation import Allocation
 from app.models.band import Band
 from app.models.project import Project
@@ -156,3 +157,13 @@ class EmployeeRepository:
                 await session.scalars(items_stmt.offset(page * size).limit(size).order_by(User.id.asc()))
             ).all()
             return list(items), total
+
+    async def list_recent_invited_users(self, limit: int = 6) -> list:
+        stmt = (
+            select(User)
+            .where(User.status == EmployeeStatus.INVITED.value)
+            .order_by(User.created_at.desc())
+            .limit(limit)
+        )
+        async with self.db.session() as session:
+            return list((await session.scalars(stmt)).all())

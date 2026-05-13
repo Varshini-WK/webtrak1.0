@@ -252,6 +252,21 @@ class ForecastAllocationResponse(BaseModel):
     allocations: list[AllocationResponse]
 
 
+class BenchEquivalentUserItem(BaseModel):
+    emp_id: str | None
+    email: EmailStr
+    name: str
+    bench_like_percentage_of_day: float
+
+
+class BenchEquivalentUsersResponse(BaseModel):
+    current_page: int
+    total_pages: int
+    page_size: int
+    total_elements: int
+    items: list[BenchEquivalentUserItem]
+
+
 class AllocationRoleItem(BaseModel):
     id: int
     name: str
@@ -265,6 +280,8 @@ __all__ = [
     "AllocationResponse",
     "AllocationUpdateRequest",
     "BatchAllocationRow",
+    "BenchEquivalentUserItem",
+    "BenchEquivalentUsersResponse",
     "ForecastAllocationResponse",
     "AllocationListResponse",
     "AllocationRoleItem",

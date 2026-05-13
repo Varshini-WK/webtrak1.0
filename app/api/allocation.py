@@ -69,6 +69,20 @@ async def list_allocation_roles(
     return GenericResponse(message="success", data=[AllocationRoleItem.model_validate(x).model_dump() for x in result])
 
 
+@router.get("/allocation/bench-users", response_model=GenericResponse)
+async def list_bench_equivalent_users(
+    request: Request,
+    search: str | None = Query(default=None),
+    page: int = Query(default=0, ge=0),
+    size: int = Query(default=50, ge=1, le=500),
+    db=Depends(get_db),
+) -> GenericResponse:
+    require_any_role(request, {"ROLE_HR"})
+    tool = AllocationTool(db)
+    result = await tool.list_bench_equivalent_users(search=search, page=page, size=size)
+    return GenericResponse(message="success", data=result.model_dump())
+
+
 @router.get("/allocation/user", response_model=GenericResponse)
 async def list_my_allocations(request: Request, db=Depends(get_db)) -> GenericResponse:
     require_any_role(request, _AUTHENTICATED)

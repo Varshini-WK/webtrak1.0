@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
@@ -66,11 +66,22 @@ class UserOnboardCreate(BaseModel):
 
 class UserOnboardUpdate(BaseModel):
     email: EmailStr
+    name: str
     yoe: int | None = None
     experience: str | None = None
     primary_skills: list[str] = Field(default_factory=list)
     secondary_skills: list[SecondarySkillRating] = Field(default_factory=list)
     work_location_type: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("name is required")
+        if len(cleaned) > 255:
+            raise ValueError("name must be at most 255 characters")
+        return cleaned
 
     @field_validator("work_location_type", mode="before")
     @classmethod
@@ -151,3 +162,17 @@ class OnboardListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class RecentInvitedUserItem(BaseModel):
+    emp_id: str | None
+    email: EmailStr
+    name: str
+    status: str
+    user_type: str
+    department: str | None = None
+    created_at: datetime
+
+
+class RecentInvitedUsersResponse(BaseModel):
+    items: list[RecentInvitedUserItem]

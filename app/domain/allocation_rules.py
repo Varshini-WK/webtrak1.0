@@ -7,6 +7,9 @@ from enum import StrEnum
 
 MAX_ALLOCATION_HOURS_PER_DAY = 8
 BENCH_PROJECT_CODE = "BENCH"
+# Talent pool allocations are treated like bench for workforce views and listing.
+TALENT_POOL_PROJECT_CODE = "TALENT_POOL"
+BENCH_EQUIVALENT_PROJECT_CODES: frozenset[str] = frozenset({BENCH_PROJECT_CODE, TALENT_POOL_PROJECT_CODE})
 OPEN_END_HORIZON_YEARS = 3
 
 

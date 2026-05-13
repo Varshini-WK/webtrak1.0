@@ -23,6 +23,8 @@ from app.schemas.employee import (
     OnboardListResponse,
     OnboardUserResponse,
     ProfileUpdateRequest,
+    RecentInvitedUserItem,
+    RecentInvitedUsersResponse,
     UserOnboardCreate,
     UserOnboardUpdate,
 )
@@ -447,7 +449,7 @@ class EmployeeService:
                     )
 
             await self.profile_repo.update_profile(user.id, profile_update, client=transaction)
-            user_updates: dict[str, str] = {"status": "ACTIVE"}
+            user_updates: dict[str, str] = {"status": "ACTIVE", "name": payload.name}
             if payload.work_location_type is not None:
                 user_updates["workLocationType"] = payload.work_location_type
             await self.profile_repo.update_user(user.id, user_updates, client=transaction)
@@ -582,6 +584,23 @@ class EmployeeService:
             total=total,
             page=page,
             size=size,
+        )
+
+    async def get_recent_invited_users(self) -> RecentInvitedUsersResponse:
+        users = await self.employee_repo.list_recent_invited_users(limit=6)
+        return RecentInvitedUsersResponse(
+            items=[
+                RecentInvitedUserItem(
+                    emp_id=user.empId,
+                    email=user.email,
+                    name=user.name,
+                    status=user.status,
+                    user_type=user.userType,
+                    department=user.department,
+                    created_at=user.created_at,
+                )
+                for user in users
+            ],
         )
 
     async def import_leave_data(self, content: bytes) -> dict[str, int | str]:
