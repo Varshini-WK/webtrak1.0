@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 
 from app.models.leave_transaction import LeaveTransaction
 
@@ -42,3 +42,22 @@ class LeaveTransactionRepository:
                 ),
             )
             return list((await session.scalars(stmt)).all())
+
+    async def list_deducts_for_user_ids_date_range(
+        self, user_ids: list[int], from_date: date, to_date: date
+    ) -> list[tuple[int, date, float]]:
+        if not user_ids:
+            return []
+        async with self.db.session() as session:
+            stmt = (
+                select(LeaveTransaction.user_id, LeaveTransaction.for_date, LeaveTransaction.value)
+                .where(
+                    LeaveTransaction.user_id.in_(user_ids),
+                    LeaveTransaction.for_date >= from_date,
+                    LeaveTransaction.for_date <= to_date,
+                    func.upper(LeaveTransaction.transaction_type) == "DEDUCT",
+                )
+                .order_by(LeaveTransaction.user_id.asc(), LeaveTransaction.for_date.asc())
+            )
+            rows = (await session.execute(stmt)).all()
+        return [(int(r[0]), r[1], float(r[2] or 0.0)) for r in rows]

@@ -44,6 +44,7 @@ def test_expected_reporting_import_routes_present() -> None:
     assert "/api/v1/upload/user-data" in paths
     assert "/api/v1/user/batch" in paths
     assert "/api/v1/leave-summary" in paths
+    assert "/api/v1/employee-attendance-leave" in paths
     assert "/api/v1/reports/workforce/headcount-distribution" in paths
     assert "/api/v1/reports/workforce/role-wise-billed" in paths
     assert "/api/v1/reports/workforce/experience" in paths

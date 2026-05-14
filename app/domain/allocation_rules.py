@@ -16,9 +16,7 @@ OPEN_END_HORIZON_YEARS = 3
 class AllocationType(StrEnum):
     STAFFING = "STAFFING"
     DEPLOYABLE = "DEPLOYABLE"
-    NONDEPLOYABLE = "NONDEPLOYABLE"
     LOCKED = "LOCKED"
-    NONBILLABLE = "NONBILLABLE"
 
 
 class ProjectType(StrEnum):
