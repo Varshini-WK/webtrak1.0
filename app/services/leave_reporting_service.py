@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import HTTPException, status
 
 from app.repositories.leave_repository import LeaveRepository
 from app.repositories.leave_transaction_repository import LeaveTransactionRepository
+from app.repositories.timelog_repository import TimeLogRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.leave_reporting import LeaveDetailsResponse, LeaveSummaryItem, LeaveSummaryPage
+from app.schemas.leave_reporting import (
+    AttendanceLeaveReportPage,
+    EmployeeAttendanceLeaveRow,
+    LeaveDayEntry,
+    LeaveDetailsResponse,
+    LeaveSummaryItem,
+    LeaveSummaryPage,
+)
 
 
 class LeaveReportingService:
@@ -16,6 +24,17 @@ class LeaveReportingService:
         self.user_repo = UserRepository(db)
         self.leave_repo = LeaveRepository(db)
         self.leave_tx_repo = LeaveTransactionRepository(db)
+        self.timelog_repo = TimeLogRepository(db)
+
+    @staticmethod
+    def _count_weekdays(start: date, end: date) -> int:
+        n = 0
+        d = start
+        while d <= end:
+            if d.weekday() < 5:
+                n += 1
+            d += timedelta(days=1)
+        return n
 
     async def _get_leave_details_for_lop(self, *, user_id: int, year: int, month: int, lop: float) -> list[LeaveDetailsResponse]:
         if lop <= 0:
@@ -138,5 +157,88 @@ class LeaveReportingService:
             page_size=size,
             total_element=total,
             data=paged,
+        )
+
+    async def fetch_attendance_leave_report(
+        self,
+        *,
+        from_date: date,
+        to_date: date,
+        search: str | None,
+        user_type: str | None,
+        band: str | None,
+        page: int,
+        size: int,
+    ) -> AttendanceLeaveReportPage:
+        if to_date < from_date:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="toDate must be on or after fromDate")
+        span = (to_date - from_date).days + 1
+        if span > 400:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Date range too large (maximum 400 calendar days)",
+            )
+
+        working = self._count_weekdays(from_date, to_date)
+        users = await self.user_repo.list_users_with_filters(
+            search=search,
+            band=band,
+            user_type=user_type,
+            statuses=["ACTIVE", "ONBOARDING", "INVITED"],
+        )
+        total = len(users)
+        start = page * size
+        end = start + size
+        page_users = users[start:end] if start < total else []
+        user_ids = [int(u.id) for u in page_users]
+
+        deduct_rows = await self.leave_tx_repo.list_deducts_for_user_ids_date_range(user_ids, from_date, to_date)
+        leave_sum: dict[int, float] = defaultdict(float)
+        leave_by_user_date: dict[int, dict[date, float]] = defaultdict(lambda: defaultdict(float))
+        for uid, for_d, val in deduct_rows:
+            v = float(val or 0.0)
+            leave_sum[int(uid)] += v
+            leave_by_user_date[int(uid)][for_d] += v
+
+        log_pairs = await self.timelog_repo.list_distinct_user_log_dates_in_range(user_ids, from_date, to_date)
+        logged_days: dict[int, set[date]] = defaultdict(set)
+        for uid, log_d in log_pairs:
+            if log_d.weekday() < 5:
+                logged_days[int(uid)].add(log_d)
+
+        rows: list[EmployeeAttendanceLeaveRow] = []
+        for u in page_users:
+            uid = int(u.id)
+            lv = float(leave_sum.get(uid, 0.0))
+            per_day = leave_by_user_date.get(uid, {})
+            leave_dates = sorted(
+                (LeaveDayEntry(leave_date=d, value=float(per_day[d])) for d in per_day),
+                key=lambda x: x.leave_date,
+            )
+            attended = max(0.0, float(working) - lv)
+            rows.append(
+                EmployeeAttendanceLeaveRow(
+                    user_id=uid,
+                    emp_id=u.emp_id,
+                    email=u.email,
+                    name=u.name,
+                    working_weekdays_in_range=working,
+                    leave_days_taken=lv,
+                    leave_dates=leave_dates,
+                    total_attendance_days=attended,
+                    weekday_days_with_timelog=len(logged_days.get(uid, set())),
+                )
+            )
+
+        total_pages = 0 if total == 0 else (total + size - 1) // size
+        return AttendanceLeaveReportPage(
+            from_date=from_date,
+            to_date=to_date,
+            working_weekdays_in_range=working,
+            current_page=page,
+            total_page=total_pages,
+            page_size=size,
+            total_element=total,
+            employees=rows,
         )
 

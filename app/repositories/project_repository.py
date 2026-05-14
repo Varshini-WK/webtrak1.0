@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +16,8 @@ def _map_project_write_keys(data: dict) -> dict:
         "projectName": "project_name",
         "projectType": "project_type",
         "isActive": "is_active",
+        "clientName": "client_name",
+        "accountManagerUserId": "account_manager_user_id",
     }
     return {keymap.get(k, k): v for k, v in data.items()}
 
@@ -24,7 +28,11 @@ class ProjectRepository:
 
     async def get_by_code(self, project_code: str):
         async with self.db.session() as session:
-            return await session.scalar(select(Project).where(Project.project_code == project_code))
+            return await session.scalar(
+                select(Project)
+                .where(Project.project_code == project_code)
+                .options(selectinload(Project.account_manager))
+            )
 
     async def get_by_name_case_insensitive(self, project_name: str):
         async with self.db.session() as session:
@@ -37,11 +45,20 @@ class ProjectRepository:
                 row = Project(**payload)
                 session.add(row)
                 await session.flush()
-                return row
+                loaded = await session.scalar(
+                    select(Project)
+                    .where(Project.id == row.id)
+                    .options(selectinload(Project.account_manager))
+                    .limit(1)
+                )
+                return loaded
         row = Project(**payload)
         client.add(row)
         await client.flush()
-        return row
+        loaded = await client.scalar(
+            select(Project).where(Project.id == row.id).options(selectinload(Project.account_manager)).limit(1)
+        )
+        return loaded
 
     async def list_projects(self, page: int, size: int, search: str | None, exclude_codes: list[str]):
         filters = []
@@ -58,7 +75,12 @@ class ProjectRepository:
                 items_stmt = items_stmt.where(*filters)
             total = int((await session.scalar(total_stmt)) or 0)
             items = (
-                await session.scalars(items_stmt.order_by(Project.created_at.desc()).offset(page * size).limit(size))
+                await session.scalars(
+                    items_stmt.options(selectinload(Project.account_manager))
+                    .order_by(Project.created_at.desc())
+                    .offset(page * size)
+                    .limit(size)
+                )
             ).all()
             return list(items), total
 
@@ -70,14 +92,30 @@ class ProjectRepository:
             term = f"%{search}%"
             filters.append(or_(Project.project_code.ilike(term), Project.project_name.ilike(term)))
         async with self.db.session() as session:
-            stmt = select(Project)
+            stmt = select(Project).options(selectinload(Project.account_manager))
             if filters:
                 stmt = stmt.where(*filters)
             return list((await session.scalars(stmt.order_by(Project.project_name.asc()))).all())
 
+    async def get_user_by_id(self, user_id: int):
+        async with self.db.session() as session:
+            return await session.get(User, user_id)
+
     async def get_user_by_email(self, email: str):
         async with self.db.session() as session:
             return await session.scalar(select(User).where(User.email == email))
+
+    async def max_p_auto_sequence(self) -> int:
+        async with self.db.session() as session:
+            codes = list((await session.scalars(select(Project.project_code))).all())
+        best = 0
+        for c in codes:
+            if not c:
+                continue
+            m = re.match(r"^P(\d{3})(?:_|$)", str(c).strip().upper())
+            if m:
+                best = max(best, int(m.group(1)))
+        return best
 
     async def get_manager_project_codes(self, manager_user_id: int) -> list[str]:
         async with self.db.session() as session:
@@ -98,7 +136,13 @@ class ProjectRepository:
         if not project_codes:
             return []
         async with self.db.session() as session:
-            return list((await session.scalars(select(Project).where(Project.project_code.in_(project_codes)))).all())
+            return list(
+                (
+                    await session.scalars(
+                        select(Project).where(Project.project_code.in_(project_codes)).options(selectinload(Project.account_manager))
+                    )
+                ).all()
+            )
 
     async def get_active_allocations_for_project(self, project_code: str):
         async with self.db.session() as session:

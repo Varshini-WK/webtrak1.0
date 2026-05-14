@@ -1,33 +1,54 @@
 from datetime import date, time
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class TrainingCreateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, populate_by_name=True)
+
     name: str
     category: Literal["PROFESSIONAL", "TECHNICAL", "SOFT_SKILLS"]
     type: Literal["MANDATORY", "OPTIONAL", "HYBRID"]
     description: str | None = None
-    duration_days: int = Field(ge=1)
+    start_date: date = Field(validation_alias=AliasChoices("start_date", "startDate"))
+    end_date: date = Field(validation_alias=AliasChoices("end_date", "endDate"))
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "TrainingCreateRequest":
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
 
 
 class TrainingUpdateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, populate_by_name=True)
+
     name: str | None = None
     category: Literal["PROFESSIONAL", "TECHNICAL", "SOFT_SKILLS"] | None = None
     type: Literal["MANDATORY", "OPTIONAL", "HYBRID"] | None = None
     description: str | None = None
-    duration_days: int | None = Field(default=None, ge=1)
+    start_date: date | None = Field(default=None, validation_alias=AliasChoices("start_date", "startDate"))
+    end_date: date | None = Field(default=None, validation_alias=AliasChoices("end_date", "endDate"))
     status: Literal["DRAFT", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"] | None = None
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "TrainingUpdateRequest":
+        if self.start_date is not None and self.end_date is not None and self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
 
 
 class TrainingOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: int
     name: str
     category: str
     type: str
     description: str | None
-    duration_days: int
+    start_date: date
+    end_date: date
     status: str
     trainer_user_ids: list[int] = Field(default_factory=list)
 

@@ -286,3 +286,22 @@ class TimeLogRepository:
                 .order_by(TimeLog.log_date.asc(), Project.project_code.asc(), User.email.asc(), TimeLog.id.asc())
             )
             return list((await session.scalars(stmt)).all())
+
+    async def list_distinct_user_log_dates_in_range(
+        self, user_ids: list[int], start_date: date, end_date: date
+    ) -> list[tuple[int, date]]:
+        if not user_ids:
+            return []
+        async with self.db.session() as session:
+            stmt = (
+                select(TimeLog.user_id, TimeLog.log_date)
+                .where(
+                    TimeLog.user_id.in_(user_ids),
+                    TimeLog.log_date >= start_date,
+                    TimeLog.log_date <= end_date,
+                    TimeLog.status.in_(["SUBMITTED", "APPROVED"]),
+                )
+                .distinct()
+            )
+            rows = (await session.execute(stmt)).all()
+        return [(int(r[0]), r[1]) for r in rows]

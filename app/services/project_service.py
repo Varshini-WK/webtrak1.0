@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 
+from app.domain.project_code import format_auto_project_code
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import (
     CreateProjectRequest,
@@ -8,6 +9,7 @@ from app.schemas.project import (
     ProjectListResponse,
     ProjectResponse,
     ProjectSimpleListResponse,
+    ProjectTypeEnum,
     ProjectWithEmployeesResponse,
 )
 
@@ -35,16 +37,49 @@ class ProjectService:
 
     @staticmethod
     def _to_project_response(project) -> ProjectResponse:
+        raw_pt = project.projectType
+        if isinstance(raw_pt, ProjectTypeEnum):
+            pt_enum = raw_pt
+        else:
+            pt_enum = ProjectTypeEnum(str(raw_pt))
+        mgr = getattr(project, "account_manager", None)
         return ProjectResponse(
             project_code=project.projectCode,
             project_name=project.projectName,
-            project_type=project.projectType,
+            project_type=pt_enum,
             is_active=project.isActive,
+            client_name=getattr(project, "client_name", None),
+            account_manager_email=mgr.email if mgr else None,
+            account_manager_name=mgr.name if mgr else None,
         )
 
     async def create_project(self, payload: CreateProjectRequest) -> ProjectResponse:
-        project_code = self._clean_project_code(payload.project_code)
         project_name = self._clean_project_name(payload.project_name)
+        client_name = self._clean_project_name(payload.client_name)
+
+        account_manager = await self.repo.get_user_by_email(str(payload.account_manager_email).strip().lower())
+        if not account_manager:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Account manager employee not found for the given email",
+            )
+
+        raw_code = (payload.project_code or "").strip()
+        if raw_code:
+            project_code = self._clean_project_code(raw_code)
+        else:
+            seq_start = await self.repo.max_p_auto_sequence() + 1
+            project_code = ""
+            for seq in range(seq_start, seq_start + 200):
+                candidate = format_auto_project_code(seq, client_name)
+                if not await self.repo.get_by_code(candidate):
+                    project_code = candidate
+                    break
+            if not project_code:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Could not allocate a unique project code",
+                )
 
         if await self.repo.get_by_code(project_code):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project code already exists")
@@ -57,6 +92,8 @@ class ProjectService:
                 "projectName": project_name,
                 "projectType": payload.project_type.value,
                 "isActive": True,
+                "clientName": client_name,
+                "accountManagerUserId": account_manager.id,
             }
         )
         return self._to_project_response(created)

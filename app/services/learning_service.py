@@ -53,7 +53,8 @@ class LearningService:
             "category": training.category,
             "type": training.type,
             "description": training.description,
-            "duration_days": training.duration_days,
+            "start_date": training.start_date,
+            "end_date": training.end_date,
             "status": training.status,
             "trainer_user_ids": [t.trainer_user_id for t in getattr(training, "trainers", [])],
         }
@@ -66,7 +67,8 @@ class LearningService:
                 "category": payload.category,
                 "type": payload.type,
                 "description": payload.description,
-                "duration_days": payload.duration_days,
+                "start_date": payload.start_date,
+                "end_date": payload.end_date,
                 "status": "DRAFT",
                 "created_by": actor_user_id,
             }
@@ -76,9 +78,19 @@ class LearningService:
 
     async def update_training(self, training_id: int, payload, *, actor_roles: set[str]):
         self._require_hr(actor_roles)
+        training = await self.repo.get_training(training_id)
+        if not training:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Training not found")
         update = payload.model_dump(exclude_none=True)
         if "name" in update:
             update["name"] = update["name"].strip()
+        merged_start = update.get("start_date", training.start_date)
+        merged_end = update.get("end_date", training.end_date)
+        if merged_end < merged_start:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="end_date must be on or after start_date",
+            )
         row = await self.repo.update_training(training_id, update)
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Training not found")
