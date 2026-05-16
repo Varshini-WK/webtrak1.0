@@ -32,6 +32,12 @@ def test_expected_timelog_routes_present() -> None:
     assert "/api/v1/export/timelogs/{projectCode}/{startDate}/{endDate}" in paths
 
 
+def test_expected_project_manager_routes_present() -> None:
+    paths = {route.path for route in app.routes}
+    assert "/api/v1/manager-projects" in paths
+    assert "/api/v1/manager-team-on-leave-today" in paths
+
+
 def test_expected_scheduler_route_present() -> None:
     paths = {route.path for route in app.routes}
     assert "/api/v1/scheduler/run-all" in paths

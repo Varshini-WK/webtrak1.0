@@ -70,3 +70,35 @@ class ManagerProjectsResponse(BaseModel):
     manager_email: str
     manager_name: str
     projects: list[ProjectWithEmployeesResponse]
+
+
+class ManagerTeamOnLeaveProjectItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    project_code: str = Field(validation_alias=AliasChoices("project_code", "projectCode"))
+    project_name: str = Field(validation_alias=AliasChoices("project_name", "projectName"))
+
+
+class ManagerTeamOnLeaveMember(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_id: int = Field(validation_alias=AliasChoices("user_id", "userId"))
+    emp_id: str | None = Field(default=None, validation_alias=AliasChoices("emp_id", "empId"))
+    email: str
+    name: str
+    leave_units_today: float = Field(
+        validation_alias=AliasChoices("leave_units_today", "leaveUnitsToday"),
+        description="Sum of DEDUCT leave_transactions for the reference date (e.g. 0.5 half-day).",
+    )
+    projects: list[ManagerTeamOnLeaveProjectItem]
+
+
+class ManagerTeamOnLeaveTodayResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    as_of_date: date = Field(validation_alias=AliasChoices("as_of_date", "asOfDate"))
+    manager_email: str
+    manager_name: str
+    team_on_leave: list[ManagerTeamOnLeaveMember] = Field(
+        validation_alias=AliasChoices("team_on_leave", "teamOnLeave"),
+    )

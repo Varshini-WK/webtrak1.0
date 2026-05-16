@@ -19,6 +19,13 @@ class UserRepository:
         async with self.db.session() as session:
             return await session.get(User, user_id)
 
+    async def list_by_ids(self, user_ids: list[int]) -> list[User]:
+        if not user_ids:
+            return []
+        uniq = sorted(set(user_ids))
+        async with self.db.session() as session:
+            return list((await session.scalars(select(User).where(User.id.in_(uniq)))).all())
+
     async def get_by_emp_id(self, emp_id: str):
         async with self.db.session() as session:
             return await session.scalar(select(User).where(User.emp_id == emp_id))

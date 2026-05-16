@@ -17,6 +17,12 @@ class Attrition(Base):
     critical_skill: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_regretted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_working_day: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    resignation_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notice_period_days: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Calendar days from resignation_date through last_working_day (inclusive).",
+    )
     designation: Mapped[str | None] = mapped_column(String(100), nullable=True)
     band_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     band_role: Mapped[str | None] = mapped_column(

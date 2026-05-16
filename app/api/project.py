@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.access import get_actor_email, require_any_role
@@ -79,6 +81,19 @@ async def get_manager_projects_with_roles(request: Request, db=Depends(get_db)) 
     email = get_actor_email(request)
     result = await ProjectTool(db).get_manager_projects_with_roles(email)
     return GenericResponse(message="success", data=result.model_dump())
+
+
+@router.get("/manager-team-on-leave-today", response_model=GenericResponse)
+async def get_manager_team_on_leave_today(
+    request: Request,
+    as_of_date: date | None = Query(default=None, alias="asOfDate"),
+    db=Depends(get_db),
+) -> GenericResponse:
+    """Team members on DEDUCT leave for the given day on projects where the caller is project manager."""
+    require_any_role(request, {"ROLE_MANAGER"})
+    email = get_actor_email(request)
+    result = await ProjectTool(db).get_manager_team_on_leave_today(email, as_of_date)
+    return GenericResponse(message="success", data=result.model_dump(mode="json"))
 
 
 @router.get("/project-assigned-to-user", response_model=GenericResponse)

@@ -1,26 +1,57 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class AttritionUpsertRequest(BaseModel):
-    last_working_day: date
+    model_config = ConfigDict(populate_by_name=True)
+
+    resignation_date: date = Field(
+        validation_alias=AliasChoices("resignation_date", "resignationDate"),
+        description="Date the employee resigned (or separation was initiated).",
+    )
+    last_working_day: date = Field(
+        validation_alias=AliasChoices("last_working_day", "lastWorkingDay"),
+    )
     separation_type: str = Field(..., description="VOLUNTARY or INVOLUNTARY")
     reason: str | None = None
     critical_skill: str | None = None
     is_regretted: bool = False
 
+    @model_validator(mode="after")
+    def validate_resignation_before_last_day(self) -> Self:
+        if self.resignation_date > self.last_working_day:
+            raise ValueError("resignation_date must be on or before last_working_day")
+        return self
+
+    @property
+    def notice_period_days(self) -> int:
+        """Inclusive calendar days from resignation through last working day."""
+        return (self.last_working_day - self.resignation_date).days + 1
+
 
 class AttritionRecordResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     emp_id: str | None
     employee_name: str
     separation_type: str
     reason: str | None
     critical_skill: str | None
     is_regretted: bool
-    last_working_day: date
+    resignation_date: date | None = Field(
+        default=None,
+        validation_alias=AliasChoices("resignation_date", "resignationDate"),
+    )
+    last_working_day: date = Field(validation_alias=AliasChoices("last_working_day", "lastWorkingDay"))
+    notice_period_days: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("notice_period_days", "noticePeriodDays"),
+        description="Stored notice period: inclusive days from resignation_date to last_working_day.",
+    )
     designation: str | None
     band_name: str | None
     band_role: str | None
