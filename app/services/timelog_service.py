@@ -7,8 +7,10 @@ from io import BytesIO, StringIO
 from fastapi import HTTPException, status
 from openpyxl import Workbook
 
+from app.api.access import has_all_roles
 from app.repositories.allocation_repository import AllocationRepository
 from app.repositories.timelog_repository import TimeLogRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.timelog import (
     TimeLogCreateRequest,
     TimeLogListResponse,
@@ -17,6 +19,9 @@ from app.schemas.timelog import (
     TimeLogStatusUpdateRequest,
     TimeLogUpdateRequest,
 )
+
+
+_HR_ADMIN_ROLES = frozenset({"ROLE_HR", "ROLE_ADMIN"})
 
 
 def _normalize_roles(roles: set[str]) -> set[str]:
@@ -37,12 +42,70 @@ class TimeLogService:
     def __init__(self, db) -> None:
         self.repo = TimeLogRepository(db)
         self.alloc_repo = AllocationRepository(db)
+        self.user_repo = UserRepository(db)
 
     async def _actor_user(self, actor_email: str):
         user = await self.repo.get_user_by_email(actor_email)
         if not user:
             raise _http(status.HTTP_401_UNAUTHORIZED, "UNAUTHORIZED", "Actor user not found")
         return user
+
+    async def _employee_has_hr_role(self, employee_email: str) -> bool:
+        user = await self.repo.get_user_by_email(employee_email.strip().lower())
+        if not user:
+            return False
+        names = await self.user_repo.get_role_names_for_user(int(user.id))
+        return "ROLE_HR" in _normalize_roles(set(names))
+
+    @staticmethod
+    def _can_view_hr_employee_timelogs(actor_roles: set[str]) -> bool:
+        return has_all_roles(_normalize_roles(actor_roles), _HR_ADMIN_ROLES)
+
+    async def _resolve_view_scope(
+        self,
+        *,
+        actor_email: str,
+        actor_roles: set[str],
+        employee_email: str,
+    ) -> list[str] | None:
+        """Return manager project-code filter, or None when all projects for the employee are visible."""
+        actor = actor_email.strip().lower()
+        target = employee_email.strip().lower()
+        roles = _normalize_roles(actor_roles)
+
+        if actor == target:
+            return None
+
+        if await self._employee_has_hr_role(target):
+            if not self._can_view_hr_employee_timelogs(roles):
+                raise _http(
+                    status.HTTP_403_FORBIDDEN,
+                    "INSUFFICIENT_ROLE",
+                    "HR employee timelogs require both HR and Admin roles to view",
+                )
+            return None
+
+        if roles.intersection({"ROLE_HR", "ROLE_ADMIN"}):
+            return None
+
+        if "ROLE_MANAGER" in roles:
+            manager = await self._actor_user(actor_email)
+            return await self.repo.get_manager_project_codes(manager.id)
+
+        raise _http(status.HTTP_403_FORBIDDEN, "INSUFFICIENT_ROLE", "Unauthorized user")
+
+    async def _filter_export_rows_for_hr_visibility(self, rows: list, actor_roles: set[str]) -> list:
+        if self._can_view_hr_employee_timelogs(actor_roles):
+            return rows
+        out: list = []
+        hr_cache: dict[str, bool] = {}
+        for row in rows:
+            email = str(row.employeeEmail).strip().lower()
+            if email not in hr_cache:
+                hr_cache[email] = await self._employee_has_hr_role(email)
+            if not hr_cache[email]:
+                out.append(row)
+        return out
 
     async def submit(self, actor_email: str, payload: TimeLogCreateRequest) -> TimeLogResponse:
         user = await self._actor_user(actor_email)
@@ -80,16 +143,12 @@ class TimeLogService:
         page: int,
         size: int,
     ) -> TimeLogListResponse:
-        actor = actor_email.strip().lower()
         target = employee_email.strip().lower()
-        roles = _normalize_roles(actor_roles)
-
-        allowed_project_codes: list[str] | None = None
-        if actor != target and not roles.intersection({"ROLE_HR", "ROLE_ADMIN"}):
-            if "ROLE_MANAGER" not in roles:
-                raise _http(status.HTTP_403_FORBIDDEN, "INSUFFICIENT_ROLE", "Unauthorized user")
-            manager = await self._actor_user(actor_email)
-            allowed_project_codes = await self.repo.get_manager_project_codes(manager.id)
+        allowed_project_codes = await self._resolve_view_scope(
+            actor_email=actor_email,
+            actor_roles=actor_roles,
+            employee_email=target,
+        )
 
         items, total = await self.repo.list_employee_timelogs_by_date(
             target,
@@ -160,8 +219,23 @@ class TimeLogService:
         )
         return TimeLogResponse.from_record(updated)
 
-    async def _assert_manager_scope(self, actor_email: str, actor_roles: set[str], project_code: str) -> None:
+    async def _assert_manager_scope(
+        self,
+        actor_email: str,
+        actor_roles: set[str],
+        project_code: str,
+        *,
+        employee_email: str | None = None,
+    ) -> None:
         roles = _normalize_roles(actor_roles)
+        if employee_email and await self._employee_has_hr_role(employee_email):
+            if not self._can_view_hr_employee_timelogs(roles):
+                raise _http(
+                    status.HTTP_403_FORBIDDEN,
+                    "INSUFFICIENT_ROLE",
+                    "HR employee timelogs require both HR and Admin roles to manage",
+                )
+            return
         if roles.intersection({"ROLE_HR", "ROLE_ADMIN"}):
             return
         if "ROLE_MANAGER" not in roles:
@@ -186,7 +260,9 @@ class TimeLogService:
         row = await self.repo.get_by_id(payload.timelog_id)
         if not row:
             raise _http(status.HTTP_404_NOT_FOUND, "TIMELOG_NOT_FOUND", "Time log not found", {"timelog_id": payload.timelog_id})
-        await self._assert_manager_scope(actor_email, actor_roles, row.projectCode)
+        await self._assert_manager_scope(
+            actor_email, actor_roles, row.projectCode, employee_email=str(row.employeeEmail)
+        )
         updated = await self.repo.update_status_single(payload.timelog_id, payload.status, payload.manager_comment, actor_email)
         return TimeLogResponse.from_record(updated)
 
@@ -198,7 +274,9 @@ class TimeLogService:
         payload: TimeLogStatusBatchRequest,
     ) -> dict[str, int | str]:
         code = payload.project_code.strip().upper()
-        await self._assert_manager_scope(actor_email, actor_roles, code)
+        await self._assert_manager_scope(
+            actor_email, actor_roles, code, employee_email=str(payload.employee_email)
+        )
         rows = await self.repo.update_status_batch(
             employee_email=str(payload.employee_email).lower(),
             project_code=code,
@@ -224,12 +302,19 @@ class TimeLogService:
             raise _http(status.HTTP_403_FORBIDDEN, "INSUFFICIENT_ROLE", "Manager/HR/Admin role required")
         if project_code and not roles.intersection({"ROLE_HR", "ROLE_ADMIN"}):
             await self._assert_manager_scope(actor_email, actor_roles, project_code)
+        if employee_email:
+            await self._resolve_view_scope(
+                actor_email=actor_email,
+                actor_roles=actor_roles,
+                employee_email=employee_email,
+            )
         rows = await self.repo.export_logs(
             project_code=project_code.strip().upper() if project_code else None,
             employee_email=employee_email.lower() if employee_email else None,
             start_date=start_date,
             end_date=end_date,
         )
+        rows = await self._filter_export_rows_for_hr_visibility(rows, actor_roles)
         buffer = StringIO()
         writer = csv.writer(buffer)
         writer.writerow(["id", "employee_email", "project_code", "log_date", "hours", "status", "description", "reviewed_by"])
@@ -263,12 +348,19 @@ class TimeLogService:
             raise _http(status.HTTP_403_FORBIDDEN, "INSUFFICIENT_ROLE", "Manager/HR/Admin role required")
         if project_code and not roles.intersection({"ROLE_HR", "ROLE_ADMIN"}):
             await self._assert_manager_scope(actor_email, actor_roles, project_code)
-        return await self.repo.export_logs(
+        if employee_email:
+            await self._resolve_view_scope(
+                actor_email=actor_email,
+                actor_roles=actor_roles,
+                employee_email=employee_email,
+            )
+        rows = await self.repo.export_logs(
             project_code=project_code.strip().upper() if project_code else None,
             employee_email=employee_email.lower() if employee_email else None,
             start_date=start_date,
             end_date=end_date,
         )
+        return await self._filter_export_rows_for_hr_visibility(rows, actor_roles)
 
     def build_time_logs_xlsx(self, rows: list) -> bytes:
         workbook = Workbook()

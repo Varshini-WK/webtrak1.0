@@ -66,11 +66,6 @@ async def get_timelogs_java_contract(
     actor_email = get_actor_email(request).strip().lower()
     actor_roles = get_actor_roles(request)
     target = empEmail.strip().lower()
-    allowed = actor_email == target or bool(actor_roles.intersection({"ROLE_HR", "ROLE_ADMIN", "ROLE_MANAGER"}))
-    if not allowed:
-        from fastapi import HTTPException, status
-
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized user")
     result = await TimeLogTool(db).list_logs_by_user_and_date(
         actor_email=actor_email,
         actor_roles=actor_roles,

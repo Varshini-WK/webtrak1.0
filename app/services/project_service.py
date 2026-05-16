@@ -1,10 +1,18 @@
+from datetime import date
+
 from fastapi import HTTPException, status
 
 from app.domain.project_code import format_auto_project_code
+from app.repositories.allocation_repository import AllocationRepository
+from app.repositories.leave_transaction_repository import LeaveTransactionRepository
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.project import (
     CreateProjectRequest,
     ManagerProjectsResponse,
+    ManagerTeamOnLeaveMember,
+    ManagerTeamOnLeaveProjectItem,
+    ManagerTeamOnLeaveTodayResponse,
     ProjectCodeNameResponse,
     ProjectListResponse,
     ProjectResponse,
@@ -20,6 +28,9 @@ SYSTEM_PROJECT_CODES = {"BENCH", "GLOBAL", "TALENT_POOL"}
 class ProjectService:
     def __init__(self, db) -> None:
         self.repo = ProjectRepository(db)
+        self.alloc_repo = AllocationRepository(db)
+        self.leave_tx_repo = LeaveTransactionRepository(db)
+        self.user_repo = UserRepository(db)
 
     @staticmethod
     def _clean_project_code(project_code: str) -> str:
@@ -161,6 +172,88 @@ class ProjectService:
             )
 
         return ManagerProjectsResponse(manager_email=manager.email, manager_name=manager.name, projects=result_projects)
+
+    async def get_manager_team_on_leave_today(
+        self, manager_email: str, as_of_date: date | None = None
+    ) -> ManagerTeamOnLeaveTodayResponse:
+        ref = as_of_date or date.today()
+        manager = await self.repo.get_user_by_email(manager_email)
+        if not manager:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manager not found")
+
+        raw_codes = await self.repo.get_manager_project_codes(manager.id)
+        project_codes = [c for c in raw_codes if c and c not in SYSTEM_PROJECT_CODES]
+        if not project_codes:
+            return ManagerTeamOnLeaveTodayResponse(
+                as_of_date=ref,
+                manager_email=manager.email,
+                manager_name=manager.name,
+                team_on_leave=[],
+            )
+
+        pairs = await self.alloc_repo.list_user_project_pairs_for_projects_on_date(project_codes, ref)
+        user_projects: dict[int, set[str]] = {}
+        for user_id, code in pairs:
+            if user_id == manager.id:
+                continue
+            user_projects.setdefault(user_id, set()).add(code)
+
+        candidate_ids = sorted(user_projects.keys())
+        if not candidate_ids:
+            return ManagerTeamOnLeaveTodayResponse(
+                as_of_date=ref,
+                manager_email=manager.email,
+                manager_name=manager.name,
+                team_on_leave=[],
+            )
+
+        deduct_rows = await self.leave_tx_repo.list_deducts_for_user_ids_date_range(candidate_ids, ref, ref)
+        leave_sum: dict[int, float] = {}
+        for uid, _d, val in deduct_rows:
+            leave_sum[uid] = leave_sum.get(uid, 0.0) + val
+
+        on_leave_ids = sorted(uid for uid in candidate_ids if leave_sum.get(uid, 0.0) > 0.0)
+        if not on_leave_ids:
+            return ManagerTeamOnLeaveTodayResponse(
+                as_of_date=ref,
+                manager_email=manager.email,
+                manager_name=manager.name,
+                team_on_leave=[],
+            )
+
+        projects = await self.repo.get_projects_by_codes(project_codes)
+        name_by_code = {p.projectCode: p.projectName for p in projects}
+
+        users = await self.user_repo.list_by_ids(on_leave_ids)
+        user_by_id = {u.id: u for u in users}
+
+        members: list[ManagerTeamOnLeaveMember] = []
+        for uid in on_leave_ids:
+            u = user_by_id.get(uid)
+            if not u:
+                continue
+            codes = sorted(user_projects.get(uid, set()))
+            proj_items = [
+                ManagerTeamOnLeaveProjectItem(project_code=c, project_name=name_by_code.get(c, c)) for c in codes
+            ]
+            members.append(
+                ManagerTeamOnLeaveMember(
+                    user_id=uid,
+                    emp_id=u.empId,
+                    email=u.email,
+                    name=u.name,
+                    leave_units_today=round(leave_sum.get(uid, 0.0), 4),
+                    projects=proj_items,
+                )
+            )
+        members.sort(key=lambda m: (m.name.lower(), m.user_id))
+
+        return ManagerTeamOnLeaveTodayResponse(
+            as_of_date=ref,
+            manager_email=manager.email,
+            manager_name=manager.name,
+            team_on_leave=members,
+        )
 
     async def get_project_codes_for_user(self, email: str) -> list[ProjectCodeNameResponse]:
         user = await self.repo.get_user_by_email(email)

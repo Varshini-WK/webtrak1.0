@@ -1,6 +1,9 @@
+from datetime import date
+
 from app.schemas.project import (
     CreateProjectRequest,
     ManagerProjectsResponse,
+    ManagerTeamOnLeaveTodayResponse,
     ProjectCodeNameResponse,
     ProjectListResponse,
     ProjectResponse,
@@ -33,6 +36,11 @@ class ProjectTool:
 
     async def get_manager_projects_with_roles(self, manager_email: str) -> ManagerProjectsResponse:
         return await self.service.get_manager_projects(manager_email, include_roles=True)
+
+    async def get_manager_team_on_leave_today(
+        self, manager_email: str, as_of_date: date | None = None
+    ) -> ManagerTeamOnLeaveTodayResponse:
+        return await self.service.get_manager_team_on_leave_today(manager_email, as_of_date)
 
     async def get_project_assigned_to_user(self, email: str) -> list[ProjectCodeNameResponse]:
         return await self.service.get_project_codes_for_user(email)

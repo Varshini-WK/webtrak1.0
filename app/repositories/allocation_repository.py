@@ -97,6 +97,27 @@ class AllocationRepository:
             )
             return list((await session.scalars(stmt)).all())
 
+    async def list_user_project_pairs_for_projects_on_date(
+        self, project_codes: list[str], on_date: date
+    ) -> list[tuple[int, str]]:
+        """Distinct (user_id, project_code) for active allocations overlapping ``on_date``."""
+        if not project_codes:
+            return []
+        async with self.db.session() as session:
+            stmt = (
+                select(Allocation.user_id, Project.project_code)
+                .join(Project, Allocation.project_id == Project.id)
+                .where(
+                    Project.project_code.in_(project_codes),
+                    Allocation.is_active.is_(True),
+                    Allocation.start_date <= on_date,
+                    or_(Allocation.end_date.is_(None), Allocation.end_date >= on_date),
+                )
+                .distinct()
+            )
+            rows = (await session.execute(stmt)).all()
+        return [(int(r[0]), str(r[1])) for r in rows]
+
     async def list_user_ids_with_non_bench_on_dates(self, dates: list[date]) -> list[int]:
         if not dates:
             return []

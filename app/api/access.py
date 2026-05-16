@@ -65,3 +65,18 @@ def require_any_role(request: Request, allowed_roles: set[str]) -> None:
     roles = get_actor_roles(request)
     if not roles.intersection(allowed_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
+
+
+def has_all_roles(roles: set[str], required_roles: set[str]) -> bool:
+    """True when every required role is present (e.g. both HR and Admin)."""
+    required = {_normalize_role_token(r) for r in required_roles}
+    return required.issubset(roles)
+
+
+def require_all_roles(request: Request, required_roles: set[str]) -> None:
+    settings = get_settings()
+    if not settings.enable_role_checks:
+        return
+    roles = get_actor_roles(request)
+    if not has_all_roles(roles, required_roles):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
