@@ -155,7 +155,7 @@ def test_utilization_by_department_uses_fractional_allocation_shares() -> None:
         (1, 4, "BILLED", "P1", date(2026, 4, 1)),
         (1, 4, "BUFFER", "P2", date(2026, 4, 1)),
         (2, 8, "INVESTMENT", "P3", date(2026, 4, 1)),
-        (3, 8, None, "BENCH", date(2026, 4, 20)),
+        (3, 8, "TALENT_POOL", "BENCH", date(2026, 4, 20)),
     ]
     service = _service_with_repo(_FakeRepo(users, allocations, {}))
 

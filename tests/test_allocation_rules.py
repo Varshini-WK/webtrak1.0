@@ -136,6 +136,18 @@ def test_allocation_create_request_billing_status_alias_and_normalization() -> N
     assert m.billing_status == "BILLED"
 
 
+def test_allocation_create_request_accepts_talent_pool_billing_status() -> None:
+    m = AllocationCreateRequest(
+        employee_email="a@b.co",
+        project_code="BENCH",
+        allocated_hours=8,
+        start_date=date(2025, 1, 1),
+        allocation_type=AllocationType.DEPLOYABLE,
+        billing_status="TALENT_POOL",
+    )
+    assert m.billing_status == "TALENT_POOL"
+
+
 def test_allocation_create_request_rejects_invalid_billing_status() -> None:
     with pytest.raises(ValidationError):
         AllocationCreateRequest(

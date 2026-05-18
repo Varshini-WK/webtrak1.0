@@ -110,7 +110,7 @@ class TimeLogService:
     async def submit(self, actor_email: str, payload: TimeLogCreateRequest) -> TimeLogResponse:
         user = await self._actor_user(actor_email)
         code = payload.project_code.strip().upper()
-        if code in {"BENCH", "GLOBAL", "TALENT_POOL"}:
+        if code in {"BENCH", "GLOBAL"}:
             raise _http(status.HTTP_400_BAD_REQUEST, "INVALID_PROJECT", "Cannot submit timelog for system projects")
         if not await self.repo.project_exists(code):
             raise _http(status.HTTP_404_NOT_FOUND, "PROJECT_NOT_FOUND", "Project not found", {"project_code": code})

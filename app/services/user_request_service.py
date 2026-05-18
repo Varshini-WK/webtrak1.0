@@ -6,7 +6,7 @@ import re
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 
-from app.domain.allocation_rules import BENCH_EQUIVALENT_PROJECT_CODES
+from app.domain.allocation_rules import BENCH_PROJECT_CODE
 from app.models.allocation import Allocation
 from app.models.leave_mapping import LeaveMapping
 from app.models.project import Project
@@ -129,7 +129,7 @@ class UserRequestService:
                 .join(Project, Allocation.project_id == Project.id)
                 .where(
                     *base_where,
-                    func.upper(Project.project_code).notin_(tuple(BENCH_EQUIVALENT_PROJECT_CODES)),
+                    func.upper(Project.project_code).notin_([BENCH_PROJECT_CODE, "GLOBAL"]),
                 )
                 .limit(1)
             )
@@ -205,7 +205,7 @@ class UserRequestService:
                 .where(
                     Allocation.user_id == user_id,
                     Allocation.is_active.is_(True),
-                    Project.project_code.notin_(list(BENCH_EQUIVALENT_PROJECT_CODES) + ["GLOBAL"]),
+                    Project.project_code.notin_([BENCH_PROJECT_CODE, "GLOBAL"]),
                     Project.project_type.in_(["CLIENT", "STAFFING"]),
                 )
             )

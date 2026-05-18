@@ -22,7 +22,7 @@ from app.schemas.project import (
 )
 
 
-SYSTEM_PROJECT_CODES = {"BENCH", "GLOBAL", "TALENT_POOL"}
+SYSTEM_PROJECT_CODES = {"BENCH", "GLOBAL"}
 
 
 class ProjectService:

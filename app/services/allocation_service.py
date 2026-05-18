@@ -10,7 +10,6 @@ from app.domain.allocation_rules import (
     MAX_ALLOCATION_HOURS_PER_DAY,
     AllocationRuleError,
     AllocationType,
-    BENCH_EQUIVALENT_PROJECT_CODES,
     BENCH_PROJECT_CODE,
     assert_new_allocation_fits_daily_cap,
     as_date,
@@ -91,7 +90,7 @@ class AllocationService:
         cleaned = role.strip()
         if not cleaned:
             return None
-        if project_code.strip().upper() in BENCH_EQUIVALENT_PROJECT_CODES:
+        if project_code.strip().upper() == BENCH_PROJECT_CODE:
             return cleaned
         matched = await self.alloc_role_repo.get_by_name_case_insensitive(cleaned)
         if not matched:
@@ -484,7 +483,7 @@ class AllocationService:
             user_id = u.id
 
         pc = project_code.strip().upper() if project_code else None
-        if pc in BENCH_EQUIVALENT_PROJECT_CODES and view and view.upper() == "CURRENT":
+        if pc == BENCH_PROJECT_CODE and view and view.upper() == "CURRENT":
             items, total = await self.alloc_repo.find_current_bench_page(search=search, page=page, size=size)
         else:
             items, total = await self.alloc_repo.list_page(
@@ -569,7 +568,7 @@ class AllocationService:
         rows = await self.alloc_repo.get_active_for_user(user.id)
         out: list[UserAllocationItem] = []
         for a in rows:
-            if a.projectCode in BENCH_EQUIVALENT_PROJECT_CODES:
+            if a.projectCode == BENCH_PROJECT_CODE:
                 continue
             proj = await self.project_repo.get_by_code(a.projectCode)
             project_name = proj.projectName if proj else a.projectCode

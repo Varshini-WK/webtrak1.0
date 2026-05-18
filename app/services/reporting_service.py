@@ -7,7 +7,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from app.domain.allocation_rules import BENCH_EQUIVALENT_PROJECT_CODES
+from app.domain.allocation_rules import BENCH_PROJECT_CODE
+from app.domain.billing_status import is_talent_pool_billing
 from app.repositories.attrition_repository import AttritionRepository
 from app.repositories.reporting_repository import ReportingRepository
 from app.repositories.user_repository import UserRepository
@@ -115,7 +116,7 @@ def _page_bounds(*, page: int, size: int, total: int) -> _Page:
 class ReportingService:
     _ACTIVE_STATUSES = ["ACTIVE", "ONBOARDING", "INVITED"]
     _BILLED_STATUSES = {"BILLED", "BUFFER"}
-    _UNBILLED_STATUSES = {"BENCH", "INVESTMENT"}
+    _UNBILLED_STATUSES = {"BENCH", "INVESTMENT", "TALENT_POOL"}
     _MAX_DAILY_HOURS = 8.0
 
     _SEPARATION_VOLUNTARY = "VOLUNTARY"
@@ -289,9 +290,8 @@ class ReportingService:
             if share <= 0:
                 continue
             token = (billing_status or "").strip().upper().replace("-", "_").replace(" ", "_")
-            code = (project_code or "").strip().upper()
             per_user[uid]["total"] += share
-            if code in BENCH_EQUIVALENT_PROJECT_CODES:
+            if is_talent_pool_billing(billing_status):
                 per_user[uid]["talent"] += share
             elif token == "BILLED":
                 per_user[uid]["billed"] += share
@@ -393,7 +393,7 @@ class ReportingService:
             if share <= 0:
                 continue
             code = (project_code or "").strip().upper()
-            if code in BENCH_EQUIVALENT_PROJECT_CODES:
+            if code == BENCH_PROJECT_CODE:
                 per_user[uid]["bench_share"] += share
                 per_user[uid]["bench_start_dates"].append(start_date)
             else:
