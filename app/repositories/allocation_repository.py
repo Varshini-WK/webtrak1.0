@@ -3,7 +3,8 @@ from datetime import UTC, date, datetime
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
-from app.domain.allocation_rules import BENCH_EQUIVALENT_PROJECT_CODES, BENCH_PROJECT_CODE
+from app.domain.allocation_rules import BENCH_PROJECT_CODE
+from app.domain.billing_status import TALENT_POOL_BILLING_STATUS
 from app.models.allocation import Allocation
 from app.models.allocation_work_location_override import AllocationWorkLocationOverride
 from app.models.allocation_type_override import AllocationTypeOverride
@@ -131,7 +132,7 @@ class AllocationRepository:
                     Allocation.is_active.is_(True),
                     Allocation.start_date <= max_date,
                     or_(Allocation.end_date.is_(None), Allocation.end_date >= min_date),
-                    func.upper(Project.project_code).notin_(tuple(BENCH_EQUIVALENT_PROJECT_CODES)),
+                    func.upper(Project.project_code) != BENCH_PROJECT_CODE,
                 )
                 .distinct()
                 .order_by(Allocation.user_id.asc())
@@ -371,7 +372,7 @@ class AllocationRepository:
         today_dt = _day_start_utc(today)
         filters = [
             Allocation.is_active.is_(True),
-            func.upper(Project.project_code).in_(tuple(BENCH_EQUIVALENT_PROJECT_CODES)),
+            func.upper(Project.project_code) == BENCH_PROJECT_CODE,
             Allocation.start_date <= today_dt,
             or_(Allocation.end_date.is_(None), Allocation.end_date >= today_dt),
         ]
@@ -404,20 +405,23 @@ class AllocationRepository:
     async def list_bench_equivalent_users_page(
         self, *, search: str | None, page: int, size: int
     ) -> tuple[list[User], dict[int, int], int]:
-        """Users with an active allocation today on BENCH or TALENT_POOL (bench-equivalent)."""
+        """Users with an active allocation today on BENCH or with billing_status TALENT_POOL."""
         today_dt = _day_start_utc(date.today())
-        base_filters = [
+        active_window = [
             Allocation.is_active.is_(True),
-            func.upper(Project.project_code).in_(tuple(BENCH_EQUIVALENT_PROJECT_CODES)),
             Allocation.start_date <= today_dt,
             or_(Allocation.end_date.is_(None), Allocation.end_date >= today_dt),
         ]
+        bench_or_talent = or_(
+            func.upper(Project.project_code) == BENCH_PROJECT_CODE,
+            func.upper(func.trim(Allocation.billing_status)) == TALENT_POOL_BILLING_STATUS,
+        )
         uid_stmt = (
             select(Allocation.user_id)
             .select_from(Allocation)
             .join(Project, Project.id == Allocation.project_id)
             .join(User, User.id == Allocation.user_id)
-            .where(*base_filters)
+            .where(*active_window, bench_or_talent)
         )
         if search and search.strip():
             term = f"%{search.strip()}%"
@@ -448,7 +452,8 @@ class AllocationRepository:
                     .join(Project, Project.id == Allocation.project_id)
                     .where(
                         Allocation.user_id.in_(user_ids),
-                        *base_filters,
+                        *active_window,
+                        bench_or_talent,
                     )
                     .group_by(Allocation.user_id)
                 )
